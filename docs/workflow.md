@@ -167,6 +167,60 @@ If you delete first, check the child is still open rather than assuming it retar
 [#4](https://github.com/dharlabs/occasio/issues/4). Until then, treat their green ticks as
 meaning nothing.
 
+## Keeping the pins current
+
+Every action in `.github/workflows` is pinned to a full commit SHA with its release tag in a
+trailing comment, and the `visual` gate's Playwright container is pinned by digest ([#106]).
+A tag is mutable, so an unpinned action runs whatever was pushed there last. A SHA is not.
+
+The cost of that is a pin with no expiry: it stays at whatever was current the day somebody
+wrote it, security fixes included. [`.github/dependabot.yml`](../.github/dependabot.yml) is what
+closes that half of the trade for the actions. It watches the `github-actions` ecosystem weekly,
+bumps the SHA, and rewrites the trailing `# v4` comment so the comment cannot drift into a lie.
+All four actions are grouped into one PR — one review, one CI run. Security updates are exempt
+from grouping and arrive on their own, immediately.
+
+Read the group PR rather than rubber-stamping it. Dependabot rewrites the version comment only
+when the SHA it lands on is a tagged release; when it is not, the SHA moves and the comment does
+not.
+
+### The Playwright pin moves by hand, and never alone
+
+**`ci.yml`'s container digest and the `playwright` version in `package.json` are one pin written
+in two places.** The image ships browser binaries built for one client version, so a mismatch
+fails when a browser launches rather than when anything installs — the breakage surfaces in the
+`visual` gate, some distance from the change that caused it.
+
+Dependabot cannot hold those two together, for two independent reasons:
+
+- It does not read `jobs.<id>.container.image` at all. Its `docker` ecosystem covers
+  Dockerfiles, Compose files and Kubernetes manifests, not workflow YAML
+  ([dependabot-core#5819](https://github.com/dependabot/dependabot-core/issues/5819), open since
+  2022).
+- Even if it did, nothing would tell it the two must land together, so it would open two
+  unrelated PRs and the first one merged would break CI.
+
+Which is why the npm ecosystem is deliberately **absent** from `dependabot.yml`. Enabling it
+without an `ignore` for `playwright` would produce a plausible-looking PR that moves the client
+past its container. That is a separate decision from this one; make it deliberately.
+
+Bump both in a single PR:
+
+```bash
+npm install --save-exact --save-dev playwright@1.64.0
+
+# The digest the registry serves for the matching image tag:
+curl -sSI -H 'Accept: application/vnd.oci.image.index.v1+json' \
+  https://mcr.microsoft.com/v2/playwright/manifests/v1.64.0-noble |
+  grep -i docker-content-digest
+```
+
+Paste that digest into `ci.yml`'s `image:`, update the version named in the comment above it,
+and run `npm run test:visual` before pushing. `--save-exact` is not optional: the version is
+pinned without a range precisely so `npm ci` cannot float the client away from the container.
+
+[#106]: https://github.com/dharlabs/occasio/pull/106
+
 ## Releases
 
 A milestone completing is the release trigger. There is no fixed cadence — six meaningful
