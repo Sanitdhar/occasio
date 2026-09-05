@@ -1,16 +1,7 @@
-// Metro in a monorepo: the app lives in apps/mobile but its dependencies and the @occasio/*
-// packages are hoisted to the workspace root, so Metro has to watch and resolve both.
+// Expo's default config already detects the npm workspace: it watches each package in
+// packages/* individually and resolves from both apps/mobile/node_modules and the workspace
+// root. Hand-rolled watchFolders/nodeModulesPaths overrides are not just redundant here, they
+// are slower — a blanket watch on the repo root makes Metro watch far more than it needs to.
 const { getDefaultConfig } = require('expo/metro-config');
-const path = require('node:path');
 
-const projectRoot = __dirname;
-const workspaceRoot = path.resolve(projectRoot, '../..');
-
-const config = getDefaultConfig(projectRoot);
-
-config.watchFolders = [workspaceRoot];
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, 'node_modules'),
-  path.resolve(workspaceRoot, 'node_modules'),
-];
-module.exports = config;
+module.exports = getDefaultConfig(__dirname);
