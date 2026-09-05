@@ -1,7 +1,7 @@
-import { ThemeProvider, useTheme } from '@occasio/ui';
+import { useTheme } from '@occasio/ui';
 import { Stack } from 'expo-router';
+import { AppThemeProvider } from '../../src/theme/AppThemeProvider';
 import { APP_THEME } from '../../src/theme/inputs';
-import { useDeviceScheme } from '../../src/theme/useDeviceScheme';
 
 function Chrome() {
   const theme = useTheme();
@@ -21,10 +21,9 @@ function Chrome() {
  * inherit an event theme or be reachable through an event route tree.
  */
 export default function AdminLayout() {
-  const systemScheme = useDeviceScheme();
   return (
-    <ThemeProvider input={APP_THEME} systemScheme={systemScheme}>
+    <AppThemeProvider input={APP_THEME}>
       <Chrome />
-    </ThemeProvider>
+    </AppThemeProvider>
   );
 }

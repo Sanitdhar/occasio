@@ -14,7 +14,20 @@ export {
 export { PRESETS, themeInputFromPreset, type Preset } from './presets/index';
 export { pickScheme, resolveTheme } from './resolve';
 export { runThemeChecks, type CheckStatus, type ThemeCheck, type ThemeCheckReport } from './checks';
-export { TYPE_SETS, buildTypography } from './typography';
+export {
+  FONT_WEIGHTS,
+  LOADABLE_TYPE_SET_IDS,
+  SYSTEM_FAMILY,
+  TYPE_SETS,
+  buildTypography,
+  fontFace,
+  typeSetFaces,
+  typeSetSpecimen,
+  type FontWeight,
+  type LoadableTypeSetId,
+  type TypeSetFace,
+  type TypeSetSpecimen,
+} from './typography';
 export {
   PRESET_IDS,
   ThemeInputSchema,
