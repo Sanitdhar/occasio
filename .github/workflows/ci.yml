@@ -18,8 +18,8 @@ jobs:
     name: Typecheck, lint & unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -36,8 +36,8 @@ jobs:
     name: Adapter contract tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -52,23 +52,27 @@ jobs:
     name: Visual regression across tenants
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.56.0-noble
+      # Pinned by digest, not tag: a tag is mutable, so an unpinned image means CI runs
+      # whatever was pushed there last. The digest below is v1.63.0-noble, which must match
+      # the exact `playwright` version in package.json -- the image ships browsers built for
+      # that client and a mismatch fails at launch. Bump the digest and the package together.
+      image: mcr.microsoft.com/playwright@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: Screenshot every fixture tenant in light and dark
-        run: npm run test:visual --if-present
-      - uses: actions/upload-artifact@v4
-        if: failure()
+      # No --if-present. The script exists, and a gate that skips silently is not a gate.
+      - name: Render every route at both widths, light and dark
+        run: npm run test:visual
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        # Uploaded on success too: the screenshots are the point, not just the failures.
+        if: always()
         with:
-          name: visual-diffs
-          path: |
-            test-results/
-            playwright-report/
+          name: visual-screenshots
+          path: .artifacts/visual/
           retention-days: 7
 
   # D19 gate 4 — Metro and platform-split mistakes (a .native.ts reaching web).
@@ -76,8 +80,8 @@ jobs:
     name: Web export build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
