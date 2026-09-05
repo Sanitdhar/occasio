@@ -188,6 +188,12 @@ export default tseslint.config(
     },
   },
 
+  /* Build tooling logs to the terminal — that is its job. */
+  {
+    files: ['tools/**/*.ts'],
+    rules: { 'no-console': 'off' },
+  },
+
   /* D17 — literal colours and spacing are errors wherever styles are written. */
   {
     files: ['packages/ui/**', 'apps/**'],
