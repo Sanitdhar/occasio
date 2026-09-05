@@ -30,8 +30,15 @@ reviews:
     enabled: true
     auto_incremental_review: true
     drafts: false
+    # D41 stacks PRs onto feature branches, so restricting this to `main` would mean every
+    # stacked PR merged without the review D40 requires — the two decisions would contradict
+    # each other. These patterns are regexes covering the branch names in docs/workflow.md.
     base_branches:
-      - main
+      - ^main$
+      - ^feat/.*
+      - ^fix/.*
+      - ^chore/.*
+      - ^docs/.*
 
   path_filters:
     - '!package-lock.json'
