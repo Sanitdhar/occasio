@@ -6,7 +6,7 @@ type RowProps = {
   readonly theme: ResolvedTheme;
   readonly setId: TypeSetId;
   readonly selected: boolean;
-  readonly onSelect: ((setId: TypeSetId) => void) | undefined;
+  readonly onSelect: (setId: TypeSetId) => void;
 };
 
 /**
@@ -27,11 +27,15 @@ function TypeSetSpecimenRow({ theme, setId, selected, onSelect }: RowProps) {
 
   return (
     <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${set.label} typography set`}
+      /* The `aria-*` props, not `accessibilityState`. React Native Web drops
+         `accessibilityState={{ selected }}` on a radio entirely — verified against the export:
+         the element came back with role="radio" and no state attribute at all, so every row
+         announced as an unchecked radio. */
+      role="radio"
+      aria-checked={selected}
+      aria-label={`${set.label} typography set`}
       onPress={() => {
-        onSelect?.(setId);
+        onSelect(setId);
       }}
       style={{
         backgroundColor: selected ? color.brandSubtle : color.surface,
@@ -55,8 +59,8 @@ function TypeSetSpecimenRow({ theme, setId, selected, onSelect }: RowProps) {
 
 type Props = {
   readonly theme: ResolvedTheme;
-  readonly selectedId?: TypeSetId;
-  readonly onSelect?: (setId: TypeSetId) => void;
+  readonly selectedId: TypeSetId;
+  readonly onSelect: (setId: TypeSetId) => void;
 };
 
 /**
@@ -65,27 +69,35 @@ type Props = {
  * A type set cannot be described in words — "a serif display over a clean sans" is true of
  * three of these — so the picker shows each one set in its own faces.
  *
+ * `selectedId` and `onSelect` are both required. A picker whose rows announce themselves as
+ * radios and then refuse to change is worse than a list, so this component cannot be rendered
+ * in that state — the caller owns the selection or uses something else.
+ *
  * Pure: theme in, JSX out, no router and no data, so the editor can render it under a preview
  * provider later.
  */
 export function TypeSetPicker({ theme, selectedId, onSelect }: Props) {
   const { color, type, space } = theme;
   return (
-    <View accessibilityRole="radiogroup" style={{ gap: space(2) }}>
+    <View style={{ gap: space(2) }}>
       <Text style={{ ...type.title2, color: color.text }}>Typography</Text>
       <Text style={{ ...type.body, color: color.textMuted }}>
         Every set is fetched on demand and never blocks the page. Until one arrives its specimen is
         drawn in the device&apos;s own type.
       </Text>
-      {TYPE_SET_IDS.map((setId) => (
-        <TypeSetSpecimenRow
-          key={setId}
-          theme={theme}
-          setId={setId}
-          selected={setId === selectedId}
-          onSelect={onSelect}
-        />
-      ))}
+      {/* Only the rows belong inside the group — a radiogroup containing prose makes a screen
+          reader read the description as if it were an option. */}
+      <View role="radiogroup" aria-label="Typography set" style={{ gap: space(2) }}>
+        {TYPE_SET_IDS.map((setId) => (
+          <TypeSetSpecimenRow
+            key={setId}
+            theme={theme}
+            setId={setId}
+            selected={setId === selectedId}
+            onSelect={onSelect}
+          />
+        ))}
+      </View>
     </View>
   );
 }

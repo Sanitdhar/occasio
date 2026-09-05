@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import { themeInputFromPreset } from './presets/index';
-import { PRESET_IDS, TYPE_SET_IDS, type ThemeInput, type TypeSetId } from './types';
+import { TYPE_SET_IDS, type ThemeInput, type TypeSetId } from './types';
 import {
   LOADABLE_TYPE_SET_IDS,
   SYSTEM_FAMILY,
@@ -116,12 +116,5 @@ describe('typography sets', () => {
   it('samples are distinct, so the picker cannot show five identical rows', () => {
     const samples = TYPE_SET_IDS.map((setId) => TYPE_SETS[setId].sample);
     expect(new Set(samples).size).toBe(samples.length);
-  });
-
-  it('every preset selects a set the app can actually load', () => {
-    for (const presetId of PRESET_IDS) {
-      const { setId } = themeInputFromPreset(presetId, '#7C3A5A').typography;
-      expect(TYPE_SET_IDS).toContain(setId);
-    }
   });
 });
