@@ -8,7 +8,7 @@
     "web": "expo start --web",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "export:web": "expo export --platform web"
+    "export:web": "expo export --platform web --output-dir dist"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",
