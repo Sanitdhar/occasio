@@ -128,6 +128,7 @@ export type {
   Timestamptz,
   UnitKind,
   UnitRow,
+  UserRow,
   VenueRow,
 } from './rows';
 

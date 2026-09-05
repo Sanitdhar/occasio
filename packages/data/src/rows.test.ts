@@ -55,9 +55,20 @@ const mapperParameterTypes = (source: ts.SourceFile): readonly string[] =>
     });
   });
 
+/** Every name in an `export { … }` / `export type { … }` list. */
+const reExportedNames = (source: ts.SourceFile): readonly string[] =>
+  source.statements.flatMap((statement) => {
+    if (!ts.isExportDeclaration(statement)) return [];
+    const clause = statement.exportClause;
+    return clause !== undefined && ts.isNamedExports(clause)
+      ? clause.elements.map((element) => element.name.text)
+      : [];
+  });
+
 const rowsSource = parse('rows.ts');
 const domainSource = parse('domain.ts');
 const mappersSource = parse('mappers.ts');
+const indexSource = parse('index.ts');
 
 const rows = objectAliases(rowsSource).filter((alias) => alias.name.endsWith('Row'));
 const domainTypes = objectAliases(domainSource);
@@ -164,5 +175,30 @@ describe('mappers', () => {
   it('has exactly one mapper per row type', () => {
     const mapped = mapperParameterTypes(mappersSource).filter((name) => name.endsWith('Row'));
     expect([...mapped].sort()).toEqual([...rowNames].sort());
+  });
+});
+
+describe('the package barrel', () => {
+  /**
+   * `packages/data/index.ts` is the single swap point (§6), so a row type it does not re-export
+   * is invisible to the adapters and the contract suite that will be written against it — and
+   * invisible in a way nothing else complains about, since the deep import still resolves.
+   * This found a missing `UserRow` the first time it ran.
+   */
+  it('re-exports every row type', () => {
+    const exported = new Set(reExportedNames(indexSource));
+    expect(rowNames.filter((name) => !exported.has(name))).toEqual([]);
+  });
+
+  it('re-exports every mapper', () => {
+    const exported = new Set(reExportedNames(indexSource));
+    const mappers = mappersSource.statements.flatMap((statement) =>
+      ts.isVariableStatement(statement)
+        ? statement.declarationList.declarations.flatMap((d) =>
+            ts.isIdentifier(d.name) ? [d.name.text] : [],
+          )
+        : [],
+    );
+    expect(mappers.filter((name) => !exported.has(name))).toEqual([]);
   });
 });
