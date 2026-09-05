@@ -1,5 +1,6 @@
 import { resolveTheme, type ResolvedTheme, type Scheme, type ThemeInput } from '@occasio/theme';
 import { createContext, useMemo, type ReactNode } from 'react';
+import { ThemeScope } from './ThemeScope';
 
 /**
  * Supplies the resolved theme to a subtree.
@@ -38,5 +39,9 @@ export function ThemeProvider({
     [input, systemScheme, forceScheme, reducedMotion],
   );
 
-  return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={theme}>
+      <ThemeScope theme={theme}>{children}</ThemeScope>
+    </ThemeContext.Provider>
+  );
 }
