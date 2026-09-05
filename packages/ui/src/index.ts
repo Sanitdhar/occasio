@@ -3,6 +3,7 @@ export { useTheme } from './theme/useTheme';
 export { createStyles } from './theme/createStyles';
 export { ThemeScope } from './theme/ThemeScope';
 export { toCssVars } from './theme/cssVars';
+export { toElevationStyle } from './theme/elevation';
 export { createStyleCache, DEFAULT_MAX_THEMES, type StyleCache } from './theme/styleCache';
 
 export { EmptyState } from './feedback/EmptyState';

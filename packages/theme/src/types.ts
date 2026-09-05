@@ -160,6 +160,32 @@ export type ThemeTypography = {
   readonly overline: TextStyleToken;
 };
 
+/**
+ * A shadow described in platform-neutral terms.
+ *
+ * The design doc sketched `elevation` as React Native `ViewStyle` objects, but that would drag
+ * React Native types into this package, which must stay platform-free so the resolver runs in a
+ * plain test and on a server. The spec is translated per platform in `@occasio/ui` instead:
+ * `boxShadow` on web, `shadow*` plus Android's `elevation` on native.
+ */
+export type ElevationSpec = {
+  readonly y: number;
+  readonly blur: number;
+  readonly spread: number;
+  readonly opacity: number;
+  /** Tinted toward the theme rather than pure black, so shadows belong to the palette. */
+  readonly color: string;
+  /** Android's elevation scale, which is a single number rather than a shadow description. */
+  readonly android: number;
+};
+
+export type ThemeElevation = {
+  readonly none: ElevationSpec;
+  readonly sm: ElevationSpec;
+  readonly md: ElevationSpec;
+  readonly lg: ElevationSpec;
+};
+
 export type ResolvedTheme = {
   /** Stable hash of (input, scheme). Used as the style-cache key — see createStyles. */
   readonly id: string;
@@ -178,6 +204,7 @@ export type ResolvedTheme = {
     readonly hero: number;
   };
   readonly border: { readonly hairline: number; readonly standard: number };
+  readonly elevation: ThemeElevation;
   readonly image: {
     readonly heroAspect: number;
     readonly radius: number;
