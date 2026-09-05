@@ -8,7 +8,7 @@ export default function Route() {
       eyebrow="DISCOVER"
       title="Events"
       description="Every event you can reach, each card rendered in its own theme."
-      arrivesIn="#28"
+      arrivesIn="#42"
     />
   );
 }

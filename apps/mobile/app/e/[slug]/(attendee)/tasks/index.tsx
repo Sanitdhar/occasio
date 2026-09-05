@@ -8,7 +8,7 @@ export default function Route() {
       eyebrow="TASKS"
       title="My action items"
       description="What you personally need to do, and when it is due."
-      arrivesIn="#47"
+      arrivesIn="#60"
     />
   );
 }

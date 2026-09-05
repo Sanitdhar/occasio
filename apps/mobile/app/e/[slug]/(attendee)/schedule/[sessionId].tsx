@@ -8,7 +8,7 @@ export default function Route() {
       eyebrow="SESSION"
       title="Session detail"
       description="Hero, time, venue, hosts, and directions into the OS maps app."
-      arrivesIn="#32"
+      arrivesIn="#48"
     />
   );
 }

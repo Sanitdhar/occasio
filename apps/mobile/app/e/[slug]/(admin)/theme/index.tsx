@@ -8,7 +8,7 @@ export default function Route() {
       eyebrow="ADMIN"
       title="Theme editor"
       description="Pick a preset and one colour; the engine derives the rest and guarantees contrast."
-      arrivesIn="#73 to #78"
+      arrivesIn="#74 to #78"
     />
   );
 }

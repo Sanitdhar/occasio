@@ -8,7 +8,7 @@ export default function Route() {
       eyebrow="JOIN"
       title="Join an event"
       description="A six-character code, a recent event, or the QR code printed on the table."
-      arrivesIn="#27"
+      arrivesIn="#41"
     />
   );
 }

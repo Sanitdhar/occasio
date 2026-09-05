@@ -8,7 +8,7 @@ export default function Route() {
       eyebrow="ADMIN"
       title="Moderation queue"
       description="Approve, reject or hide gossip posts before attendees see them."
-      arrivesIn="#46"
+      arrivesIn="#58"
     />
   );
 }

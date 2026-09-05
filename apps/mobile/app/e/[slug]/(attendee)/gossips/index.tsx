@@ -8,7 +8,7 @@ export default function Route() {
       eyebrow="GOSSIPS"
       title="The board"
       description="Anonymous posts, approved by a host before anyone sees them."
-      arrivesIn="#43"
+      arrivesIn="#56"
     />
   );
 }

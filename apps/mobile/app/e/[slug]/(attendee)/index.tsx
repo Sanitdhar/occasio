@@ -8,7 +8,7 @@ export default function Route() {
       eyebrow="HOME"
       title="Event home"
       description="Hero, what is happening now, what is next, and who is hosting."
-      arrivesIn="#39"
+      arrivesIn="#52"
     />
   );
 }

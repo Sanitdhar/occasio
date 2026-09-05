@@ -8,7 +8,7 @@ export default function Route() {
       eyebrow="INFO"
       title="Venue and travel"
       description="Where it is, how to get there, and the questions everyone asks."
-      arrivesIn="#40"
+      arrivesIn="#53"
     />
   );
 }
