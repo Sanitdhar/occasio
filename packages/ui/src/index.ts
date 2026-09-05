@@ -15,4 +15,13 @@ export {
   type SkeletonTextRow,
 } from './feedback/skeletonText';
 
+export { Image, type ImageAspect, type ImageProps, type ImageRadius } from './media/Image';
+export {
+  imageAccessibility,
+  scrimGeometry,
+  type ImageAccessibility,
+  type ScrimGeometry,
+  type ScrimPlacement,
+} from './media/imageFrame';
+
 export const UI_PACKAGE_VERSION = '0.0.0' as const;
