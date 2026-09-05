@@ -100,15 +100,15 @@ export function SkeletonGroup({ label, children, style }: Props) {
 
   return (
     <SkeletonPulseContext.Provider value={pulse}>
-      {/* `accessible` collapses the subtree into this one node, so the bars inside are never
-          reached individually. */}
-      <View
-        style={style}
-        accessible
-        accessibilityRole="progressbar"
-        accessibilityLabel={label}
-        accessibilityState={{ busy: true }}
-      >
+      {/* ARIA prop names rather than the `accessibility*` ones. react-native-web 0.21 forwards
+          `role`, `aria-label` and `aria-busy` directly; it warns on the `accessibility*`
+          spellings and does not read `accessibilityState` at all, so the busy flag would have
+          been dropped on the platform this ships to first (D30). React Native maps all three
+          back to the native equivalents.
+
+          `accessible` has no web spelling and is kept for native, where it is what collapses
+          the subtree into this one node so the bars are never reached individually. */}
+      <View style={style} accessible role="progressbar" aria-label={label} aria-busy>
         {children}
       </View>
     </SkeletonPulseContext.Provider>

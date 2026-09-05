@@ -53,13 +53,17 @@ export function EmptyState({ illustration, title, message, action, style }: Prop
   return (
     <View style={[styles.root, style]}>
       {illustration === undefined ? null : (
-        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          {illustration}
-        </View>
+        /* `aria-hidden` covers all three platforms on its own: React Native expands it to
+           `accessibilityElementsHidden` for iOS and `importantForAccessibility` for Android,
+           and react-native-web forwards it to the DOM attribute — which the
+           `accessibility*` spellings never reach. */
+        <View aria-hidden>{illustration}</View>
       )}
-      {/* `header` rather than nothing: it is how a screen reader user skims to "what is this
-          screen showing me", which for an empty list is the only content there is. */}
-      <Text accessibilityRole="header" style={styles.title}>
+      {/* A heading rather than plain text: it is how a screen reader user skims to "what is
+          this screen showing me", which for an empty list is the only content there is.
+          `role="heading"` for the same reason as `aria-hidden` above — React Native maps it to
+          the `header` role, react-native-web forwards it, and neither warns. */}
+      <Text role="heading" style={styles.title}>
         {title}
       </Text>
       {message === undefined ? null : <Text style={styles.message}>{message}</Text>}
