@@ -1,6 +1,13 @@
-import { Text as RNText, type TextProps as RNTextProps } from 'react-native';
+import { Text as RNText, type StyleProp, type TextProps as RNTextProps } from 'react-native';
 import { createStyles } from '../theme/createStyles';
-import { textPalette, type TextTone, type TextVariant } from './textTokens';
+import type { LayoutTextStyle } from './layoutStyle';
+import {
+  textPalette,
+  type BodyTextTone,
+  type LargeTextVariant,
+  type SmallTextVariant,
+  type TextTone,
+} from './textTokens';
 
 /**
  * Every piece of text in the app.
@@ -10,8 +17,8 @@ import { textPalette, type TextTone, type TextVariant } from './textTokens';
  * theme's typography scale, density and font set therefore reach every string for free.
  *
  * Anything React Native's Text accepts still works (`numberOfLines`, `onPress`, `selectable`,
- * accessibility props), and `style` is applied last so a caller can override — layout, not
- * colour or size, is the intended use.
+ * accessibility props). `style` is narrowed to layout: a component whose contrast is proved
+ * cannot also let the caller repaint it.
  */
 
 const useTextStyles = createStyles((theme) => {
@@ -39,10 +46,17 @@ const useTextStyles = createStyles((theme) => {
   };
 });
 
-export type TextProps = RNTextProps & {
-  readonly variant?: TextVariant | undefined;
-  readonly tone?: TextTone | undefined;
-};
+/**
+ * The variant and tone are a pair, not two independent props: `faint` is only legal on a variant
+ * that reaches WCAG's large-text threshold, so the union makes an inaccessible combination fail
+ * to compile. Everything else is the same for both arms.
+ */
+export type TextProps = Omit<RNTextProps, 'style'> & {
+  readonly style?: StyleProp<LayoutTextStyle> | undefined;
+} & (
+    | { readonly variant: LargeTextVariant; readonly tone?: TextTone | undefined }
+    | { readonly variant?: SmallTextVariant | undefined; readonly tone?: BodyTextTone | undefined }
+  );
 
 export function Text({ variant = 'body', tone = 'default', style, ...rest }: TextProps) {
   const styles = useTextStyles();

@@ -28,6 +28,22 @@ export const TEXT_VARIANTS = [
 export type TextVariant = (typeof TEXT_VARIANTS)[number];
 
 /**
+ * The variants that reach WCAG's "large scale" threshold — 24px, or 18.66px at weight 700 — at
+ * *every* type scale a tenant can pick, which is what makes the 3:1 contrast floor legal.
+ *
+ * Only the two display roles clear it. `title1` looks like it should and does not: it resolves
+ * to 22px on the `compact` scale. That is why the list is measured by textTokens.test.ts across
+ * every preset, type set and scale rather than chosen by eye.
+ */
+export const LARGE_TEXT_VARIANTS = [
+  'display1',
+  'display2',
+] as const satisfies readonly TextVariant[];
+
+export type LargeTextVariant = (typeof LARGE_TEXT_VARIANTS)[number];
+export type SmallTextVariant = Exclude<TextVariant, LargeTextVariant>;
+
+/**
  * Tones are limited to the content colours the resolver already guarantees a contrast floor for.
  *
  * `brand`, `danger`, `success` and `warning` are deliberately absent. They are solid *fill*
@@ -39,6 +55,23 @@ export type TextVariant = (typeof TEXT_VARIANTS)[number];
 export const TEXT_TONES = ['default', 'muted', 'faint', 'inverse', 'onBrand', 'onAccent'] as const;
 
 export type TextTone = (typeof TEXT_TONES)[number];
+
+/**
+ * The tones that clear AA (4.5:1) and are therefore legal at any size.
+ *
+ * `faint` is the one that is not: `textFaint` is resolved against a 3:1 floor, which WCAG allows
+ * only for large text. Text's props pair it with `LARGE_TEXT_VARIANTS` so `<Text tone="faint">`
+ * on body or caption copy is a compile error rather than an accessibility bug nobody sees.
+ */
+export const BODY_TEXT_TONES = [
+  'default',
+  'muted',
+  'inverse',
+  'onBrand',
+  'onAccent',
+] as const satisfies readonly TextTone[];
+
+export type BodyTextTone = (typeof BODY_TEXT_TONES)[number];
 
 export type TextToneColors = Readonly<Record<TextTone, string>>;
 

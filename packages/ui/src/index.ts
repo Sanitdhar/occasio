@@ -16,13 +16,19 @@ export {
 } from './feedback/skeletonText';
 export { Text, type TextProps } from './components/Text';
 export {
+  BODY_TEXT_TONES,
+  LARGE_TEXT_VARIANTS,
   TEXT_TONES,
   TEXT_VARIANTS,
   textPalette,
+  type BodyTextTone,
+  type LargeTextVariant,
+  type SmallTextVariant,
   type TextTone,
   type TextToneColors,
   type TextVariant,
 } from './components/textTokens';
+export type { LayoutTextStyle, LayoutViewStyle } from './components/layoutStyle';
 
 export { Button, type ButtonProps } from './components/Button';
 export {

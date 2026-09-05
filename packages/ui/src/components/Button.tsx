@@ -1,7 +1,14 @@
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import {
+  Pressable,
+  Text,
+  View,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 import { createStyles } from '../theme/createStyles';
-import { Text } from './Text';
+import type { LayoutViewStyle } from './layoutStyle';
 import {
   buttonPalette,
   resolveButtonState,
@@ -50,7 +57,11 @@ const useButtonStyles = createStyles((theme) => {
       /* Present on every variant and every state, so nothing reflows when the state changes. */
       borderWidth: theme.border.hairline,
     },
-    label: { textAlign: 'center' },
+    /* React Native's Text rather than this package's, because the label colour is a per-state
+       palette value and the public Text API deliberately cannot express one — a `color` escape
+       there is exactly the hole that keeps a design system honest. The type role is still a
+       token, so the label follows the tenant's scale and font set. */
+    label: { ...theme.type.bodyStrong, textAlign: 'center' },
     ring: {
       position: 'absolute',
       top: -ringGap,
@@ -92,8 +103,8 @@ export type ButtonProps = {
   /** Defaults to `label`; set it when the visible label is not the whole story. */
   readonly accessibilityLabel?: string | undefined;
   readonly testID?: string | undefined;
-  /** Layout only — colour and size come from the theme. */
-  readonly style?: StyleProp<ViewStyle> | undefined;
+  /** Layout only — colour, size, radius and spacing come from the theme. */
+  readonly style?: StyleProp<LayoutViewStyle> | undefined;
 };
 
 export function Button({
@@ -158,9 +169,7 @@ export function Button({
       {showsFocusRing(focusOrigin, disabled) ? (
         <View pointerEvents="none" style={styles.ring} />
       ) : null}
-      <Text style={[styles.label, styles[`${variant}_${state}_label`]]} variant="bodyStrong">
-        {label}
-      </Text>
+      <Text style={[styles.label, styles[`${variant}_${state}_label`]]}>{label}</Text>
     </Pressable>
   );
 }

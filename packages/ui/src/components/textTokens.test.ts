@@ -1,6 +1,22 @@
 import { describe, expect, it } from '@jest/globals';
-import { contrast, resolveTheme, themeInputFromPreset, type ResolvedTheme } from '@occasio/theme';
-import { TEXT_TONES, TEXT_VARIANTS, textPalette, type TextTone } from './textTokens';
+import {
+  PRESET_IDS,
+  TYPE_SET_IDS,
+  contrast,
+  resolveTheme,
+  themeInputFromPreset,
+  type ResolvedTheme,
+  type ThemeInput,
+} from '@occasio/theme';
+import {
+  BODY_TEXT_TONES,
+  LARGE_TEXT_VARIANTS,
+  TEXT_TONES,
+  TEXT_VARIANTS,
+  textPalette,
+  type TextTone,
+  type TextVariant,
+} from './textTokens';
 import { everyTheme } from './themeMatrix.fixture';
 
 describe('text variants', () => {
@@ -13,6 +29,32 @@ describe('text variants', () => {
     ).type;
 
     expect([...TEXT_VARIANTS].sort()).toEqual(Object.keys(roles).sort());
+  });
+
+  it('admits exactly the variants that reach WCAG large text at every type scale', () => {
+    /* 24px, or 18.66px at weight 700 — the threshold that makes a 3:1 contrast floor legal, and
+       therefore the threshold that decides where the `faint` tone may be used. A tenant picks
+       the type set and the scale, so a variant only qualifies if it qualifies in all of them:
+       `title1` is 24px by default and 22px on `compact`, which is precisely the trap. */
+    const isLargeText = (variant: TextVariant, input: ThemeInput): boolean => {
+      const { fontSize, fontWeight } = resolveTheme(input).type[variant];
+      return fontSize >= 24 || (fontSize >= 18.66 && Number(fontWeight) >= 700);
+    };
+
+    const everyTypeInput = PRESET_IDS.flatMap((presetId) =>
+      TYPE_SET_IDS.flatMap((setId) =>
+        (['compact', 'default', 'grand'] as const).map((scale) => ({
+          ...themeInputFromPreset(presetId, '#7C3A5A'),
+          typography: { setId, scale },
+        })),
+      ),
+    );
+
+    const qualifying = TEXT_VARIANTS.filter((variant) =>
+      everyTypeInput.every((input) => isLargeText(variant, input)),
+    );
+
+    expect([...qualifying].sort()).toEqual([...LARGE_TEXT_VARIANTS].sort());
   });
 });
 
@@ -32,6 +74,15 @@ describe('text tones', () => {
 
   it('names a background pairing for every tone', () => {
     expect(Object.keys(PAIRS).sort()).toEqual([...TEXT_TONES].sort());
+  });
+
+  it('admits at body size exactly the tones that owe and clear AA', () => {
+    /* The floors below are what the contrast test actually enforces, so this ties the prop-level
+       restriction to the measured property rather than to a second hand-maintained list: a tone
+       that only reaches 3:1 must not be reachable from a body-sized variant. */
+    const aaTones = TEXT_TONES.filter((tone) => PAIRS[tone].min >= 4.5);
+
+    expect([...BODY_TEXT_TONES].sort()).toEqual([...aaTones].sort());
   });
 
   it.each(TEXT_TONES)('keeps %s readable on its own background, in every theme', (tone) => {
