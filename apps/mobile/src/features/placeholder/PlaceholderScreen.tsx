@@ -1,4 +1,5 @@
 import type { ResolvedTheme } from '@occasio/theme';
+import type { ReactNode } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 type Props = {
@@ -8,6 +9,8 @@ type Props = {
   readonly description: string;
   /** The issue that replaces this placeholder with the real screen. */
   readonly arrivesIn: string;
+  /** Anything of the real screen that already exists, rendered below the notice. */
+  readonly children?: ReactNode;
 };
 
 /**
@@ -17,7 +20,14 @@ type Props = {
  *
  * Pure: theme in, JSX out, no router, no data.
  */
-export function PlaceholderScreen({ theme, eyebrow, title, description, arrivesIn }: Props) {
+export function PlaceholderScreen({
+  theme,
+  eyebrow,
+  title,
+  description,
+  arrivesIn,
+  children,
+}: Props) {
   const { color, type, space, radius, border } = theme;
   return (
     <ScrollView
@@ -40,6 +50,7 @@ export function PlaceholderScreen({ theme, eyebrow, title, description, arrivesI
       >
         <Text style={{ ...type.caption, color: color.onBrandSubtle }}>Arrives in {arrivesIn}</Text>
       </View>
+      {children}
     </ScrollView>
   );
 }

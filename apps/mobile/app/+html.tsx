@@ -11,9 +11,12 @@ import type { PropsWithChildren } from 'react';
  * It is kept rather than deleted because it is correct and starts working the moment web output
  * moves to `server`, which is the plan once tenant routes need real SEO and link previews.
  *
- * Two things it has to get right for an event site opened on a phone from a chat message: a
- * viewport that will not let the page zoom out to nothing, and font connections opened before
- * the bundle finishes parsing.
+ * The thing it has to get right for an event site opened on a phone from a chat message is a
+ * viewport that will not let the page zoom out to nothing.
+ *
+ * It used to preconnect to Google Fonts. Since #31 the typography sets are bundled with the app
+ * and served from its own origin, so those two connections would be opened to a host the page
+ * never talks to — a wasted DNS lookup and TLS handshake on the first paint that matters most.
  */
 export default function Root({ children }: PropsWithChildren) {
   return (
@@ -25,10 +28,6 @@ export default function Root({ children }: PropsWithChildren) {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
         />
-        {/* Tenant typography sets are served from Google Fonts; opening the connections early
-            saves a round trip on the first paint that matters most. */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         {/* Resets body margin and lets a root ScrollView fill the viewport on web. */}
         <ScrollViewStyleReset />
       </head>

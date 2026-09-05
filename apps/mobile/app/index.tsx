@@ -1,7 +1,7 @@
-import { ThemeProvider, useTheme } from '@occasio/ui';
+import { useTheme } from '@occasio/ui';
 import { ScaffoldScreen } from '../src/features/scaffold/ScaffoldScreen';
+import { AppThemeProvider } from '../src/theme/AppThemeProvider';
 import { FIXTURE_TENANT_THEME } from '../src/theme/inputs';
-import { useDeviceScheme } from '../src/theme/useDeviceScheme';
 
 /** Reads the nearest theme and hands it to a screen that stays pure. */
 function Scaffold() {
@@ -17,10 +17,9 @@ function Scaffold() {
  * visual gate screenshots it on every run.
  */
 export default function IndexRoute() {
-  const systemScheme = useDeviceScheme();
   return (
-    <ThemeProvider input={FIXTURE_TENANT_THEME} systemScheme={systemScheme}>
+    <AppThemeProvider input={FIXTURE_TENANT_THEME}>
       <Scaffold />
-    </ThemeProvider>
+    </AppThemeProvider>
   );
 }

@@ -1,5 +1,4 @@
 import { resolveTheme } from '@occasio/theme';
-import { ThemeProvider } from '@occasio/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -7,8 +6,8 @@ import { useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../src/features/errors/ErrorFallback';
+import { AppThemeProvider } from '../src/theme/AppThemeProvider';
 import { APP_THEME } from '../src/theme/inputs';
-import { useDeviceScheme } from '../src/theme/useDeviceScheme';
 
 /**
  * Query defaults tuned for an event, not a dashboard.
@@ -60,19 +59,16 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 export default function RootLayout() {
   // Created once per app instance rather than per render, so the cache is not thrown away.
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: queryDefaults }));
-  /* Read once, here. ThemeProvider takes the scheme as a prop so it stays free of React Native
-     and can render in a plain React test or in server-rendered web output. */
-  const systemScheme = useDeviceScheme();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider input={APP_THEME} systemScheme={systemScheme}>
+        <AppThemeProvider input={APP_THEME}>
           <SafeAreaProvider>
             <StatusBar style="auto" />
             <Stack screenOptions={{ headerShown: false }} />
           </SafeAreaProvider>
-        </ThemeProvider>
+        </AppThemeProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
   );

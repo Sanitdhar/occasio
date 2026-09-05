@@ -1,7 +1,6 @@
-import { ThemeProvider } from '@occasio/ui';
 import { Slot } from 'expo-router';
+import { AppThemeProvider } from '../../../src/theme/AppThemeProvider';
 import { FIXTURE_TENANT_THEME } from '../../../src/theme/inputs';
-import { useDeviceScheme } from '../../../src/theme/useDeviceScheme';
 
 /**
  * Everything under /e/[slug] belongs to one event, and wears that event's theme.
@@ -14,10 +13,9 @@ import { useDeviceScheme } from '../../../src/theme/useDeviceScheme';
  * TenantProvider replaces the fixture input once tenancy lands.
  */
 export default function TenantLayout() {
-  const systemScheme = useDeviceScheme();
   return (
-    <ThemeProvider input={FIXTURE_TENANT_THEME} systemScheme={systemScheme}>
+    <AppThemeProvider input={FIXTURE_TENANT_THEME}>
       <Slot />
-    </ThemeProvider>
+    </AppThemeProvider>
   );
 }
