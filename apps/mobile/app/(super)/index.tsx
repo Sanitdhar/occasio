@@ -1,10 +1,10 @@
+import { useTheme } from '@occasio/ui';
 import { PlaceholderScreen } from '../../src/features/placeholder/PlaceholderScreen';
-import { useAppTheme } from '../../src/theme/useScaffoldTheme';
 
 export default function Route() {
   return (
     <PlaceholderScreen
-      theme={useAppTheme()}
+      theme={useTheme()}
       eyebrow="SUPER ADMIN"
       title="Approvals"
       description="Event admins and site publishes waiting on a decision."
