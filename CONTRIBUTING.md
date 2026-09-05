@@ -53,6 +53,11 @@ Branch off `main`, one PR per issue, squash-merge, delete the branch. Convention
 the release notes are generated from those. Run `npm run verify` before pushing; CI runs the same
 gates and will not merge without them.
 
+Every PR waits for CodeRabbit's review, and every finding gets a response — a fix, a reply
+explaining why it is not needed, or a question to the maintainer if it exposes a decision rather
+than a defect. Silence is not one of the options. Dependent work is stacked: branch off the PR
+below it and target that branch as the base.
+
 Pick something to work on from the [roadmap board](https://github.com/orgs/dharlabs/projects/1).
 Issues are scoped so `size:M` is about a day. The full process, including how releases are cut,
 is in [docs/workflow.md](docs/workflow.md).
