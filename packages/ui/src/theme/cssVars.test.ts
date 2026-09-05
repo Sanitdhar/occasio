@@ -31,6 +31,37 @@ describe('toCssVars', () => {
     expect(vars['--occasio-color-ramp']).toBeUndefined();
   });
 
+  it('emits every token group, not just colour', () => {
+    /* A partial mirror is a trap: CSS that reaches for a missing token silently renders
+       nothing, and the omission is invisible until someone writes that rule. */
+    for (const name of [
+      '--occasio-border-hairline',
+      '--occasio-type-display1-size',
+      '--occasio-type-overline-weight',
+      '--occasio-image-hero-aspect',
+      '--occasio-motion-fast',
+      '--occasio-breakpoint-md',
+    ]) {
+      expect(vars[name]).toBeDefined();
+    }
+  });
+
+  it('leaves aspect-ratio unitless, because CSS aspect-ratio takes a number', () => {
+    expect(vars['--occasio-image-hero-aspect']).not.toContain('px');
+    expect(Number.isNaN(Number(vars['--occasio-image-hero-aspect']))).toBe(false);
+  });
+
+  it('collapses durations to zero when motion is off', () => {
+    const still = toCssVars(
+      resolveTheme(themeInputFromPreset('minimal', '#3F5B7C'), {
+        forceScheme: 'light',
+        reducedMotion: true,
+      }),
+    );
+    expect(still['--occasio-motion-enabled']).toBe('0');
+    expect(still['--occasio-motion-base']).toBe('0ms');
+  });
+
   it('produces different values for different tenants', () => {
     const other = toCssVars(
       resolveTheme(themeInputFromPreset('festival', '#E8582B'), { forceScheme: 'dark' }),

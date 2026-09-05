@@ -40,12 +40,50 @@ export const toCssVars = (theme: ResolvedTheme): Readonly<Record<string, string>
     vars[`${PREFIX}-space-${String(step)}`] = `${String(theme.space(step))}px`;
   }
 
-  vars[`${PREFIX}-font-display`] = theme.type.family.display;
-  vars[`${PREFIX}-font-body`] = theme.type.family.body;
+  for (const [name, value] of Object.entries(theme.border)) {
+    vars[`${PREFIX}-border-${name}`] = `${String(value)}px`;
+  }
+
+  /* The full type scale, so CSS can set text without duplicating the numbers. Families are
+     emitted with a fallback stack, since a tenant font may still be loading (#31). */
+  vars[`${PREFIX}-font-display`] = `${theme.type.family.display}, Georgia, serif`;
+  vars[`${PREFIX}-font-body`] = `${theme.type.family.body}, system-ui, sans-serif`;
+  vars[`${PREFIX}-font-mono`] = `${theme.type.family.mono}, ui-monospace, monospace`;
+  for (const role of [
+    'display1',
+    'display2',
+    'title1',
+    'title2',
+    'body',
+    'bodyStrong',
+    'caption',
+    'overline',
+  ] as const) {
+    const token = theme.type[role];
+    vars[`${PREFIX}-type-${role}-size`] = `${String(token.fontSize)}px`;
+    vars[`${PREFIX}-type-${role}-line-height`] = `${String(token.lineHeight)}px`;
+    vars[`${PREFIX}-type-${role}-tracking`] = `${String(token.letterSpacing)}px`;
+    vars[`${PREFIX}-type-${role}-weight`] = token.fontWeight;
+  }
+
+  /* Unitless on purpose: this is a CSS `aspect-ratio`, which takes a number. */
+  vars[`${PREFIX}-image-hero-aspect`] = String(theme.image.heroAspect);
+  vars[`${PREFIX}-image-radius`] = `${String(theme.image.radius)}px`;
+  vars[`${PREFIX}-image-treatment`] = theme.image.treatment;
   vars[`${PREFIX}-scrim-from`] = theme.image.scrimGradient[0];
   vars[`${PREFIX}-scrim-to`] = theme.image.scrimGradient[1];
+
+  /* Durations collapse to 0ms when motion is off, so a CSS transition honours reduced motion
+     without every rule having to check a flag. */
+  vars[`${PREFIX}-motion-enabled`] = theme.motion.enabled ? '1' : '0';
+  vars[`${PREFIX}-motion-fast`] = `${String(theme.motion.fast)}ms`;
   vars[`${PREFIX}-motion-base`] = `${String(theme.motion.base)}ms`;
+  vars[`${PREFIX}-motion-slow`] = `${String(theme.motion.slow)}ms`;
+
   vars[`${PREFIX}-max-content-width`] = `${String(theme.layout.maxContentWidth)}px`;
+  for (const [name, value] of Object.entries(theme.layout.breakpoints)) {
+    vars[`${PREFIX}-breakpoint-${name}`] = `${String(value)}px`;
+  }
 
   return vars;
 };
