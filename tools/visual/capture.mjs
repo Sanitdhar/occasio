@@ -113,8 +113,11 @@ const run = async () => {
       }
     }
   } finally {
-    await browser?.close();
-    await server?.close();
+    /* Each cleanup step is independent. A browser.close() rejection -- which is exactly what a
+       crashed or disconnected browser produces -- must not stop the server closing or the
+       manifest being written, because a crashed run is when that evidence matters most. */
+    await browser?.close().catch(() => undefined);
+    await server?.close().catch(() => undefined);
     writeFileSync(
       join(OUT, 'manifest.json'),
       JSON.stringify(
