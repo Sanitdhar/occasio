@@ -3,10 +3,16 @@ import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 
 const TYPES = {
-  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml',
-  '.ttf': 'font/ttf', '.woff2': 'font/woff2', '.ico': 'image/x-icon',
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ttf': 'font/ttf',
+  '.woff2': 'font/woff2',
+  '.ico': 'image/x-icon',
 };
 
 /**
@@ -48,6 +54,7 @@ export const serve = (root, port = 0) => {
       stream.pipe(res);
     });
     server.listen(port, '127.0.0.1', () =>
-      resolve({ port: server.address().port, close: () => new Promise((r) => server.close(r)) }));
+      resolve({ port: server.address().port, close: () => new Promise((r) => server.close(r)) }),
+    );
   });
 };
