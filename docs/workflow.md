@@ -53,6 +53,10 @@ It does not block merges — `request_changes_workflow` is off, because a solo m
 their own PRs achieves nothing. Treat it as the reviewer you would otherwise not have, not as a
 gate. `@coderabbitai` in a comment will answer questions or re-review.
 
+The division of labour is deliberate: the four CI gates catch mechanical failures, and
+CodeRabbit is there for the judgement-level review — the design call that will hurt in three
+months, the case nobody thought to test.
+
 ### The loop every PR goes through (D40)
 
 ```
@@ -93,15 +97,11 @@ main
 Each PR's diff then shows only its own change, so review stays honest even when the work is
 sequential.
 
-**When a PR lower in the stack changes** — a review fix, usually — rebase everything above it:
+**When a PR lower in the stack changes** — a review fix, usually — rebase everything above it.
+Use `--onto`, and pass the branch the work was originally based on:
 
 ```bash
-git switch feat/18-root-layout
-git rebase feat/17-scaffold-expo-app
-git push --force-with-lease
-
-git switch feat/19-route-skeleton
-git rebase feat/18-root-layout
+git rebase --onto feat/17-scaffold-expo-app feat/17-scaffold-expo-app feat/18-root-layout
 git push --force-with-lease
 ```
 
@@ -109,12 +109,49 @@ Always `--force-with-lease`, never `--force`: it refuses to overwrite commits yo
 which is the difference between rebasing your own stack and silently discarding someone else's
 push.
 
-As each PR merges, GitHub retargets the one above it to `main` automatically. Rebase it once more
-so its diff is clean, and keep going down the stack.
+### Merging a stack, in the order that actually works
 
-The division of labour is deliberate: the four CI gates catch mechanical failures, and
-CodeRabbit is there for the judgement-level review — the design call that will hurt in three
-months, the case nobody thought to test.
+PRs here are **squash**-merged, which changes both steps below from the obvious ones. Both of
+these were learned by getting them wrong (#101).
+
+**1. Rebase with `--onto`, not plain `rebase`.** A squash merge replaces the branch's commits
+with one new commit, so the original commits are _not_ ancestors of `main`. `git rebase main`
+tries to replay them and conflicts. `--onto` replays only the commits unique to your branch:
+
+```bash
+# after PR for feat/18 is squash-merged into main
+git fetch origin
+git rebase --onto origin/main feat/18-root-layout feat/19-route-skeleton
+#            └── new base      └── old base        └── branch to move
+git push --force-with-lease
+```
+
+**2. Retarget children _before_ deleting the merged branch — or check the retarget landed.**
+
+GitHub normally retargets an open PR to the merged PR's base when the head branch is deleted.
+That is the documented behaviour and usually what happens.
+
+It is not guaranteed to win a race. Deleting the branch by API three seconds after merging #100
+produced this, with no retarget event at all:
+
+```
+19:25:32Z  #100  merged
+19:25:35Z  #101  base_ref_deleted
+19:25:35Z  #101  closed
+```
+
+A closed PR's base cannot be changed, and it cannot be reopened while its base is missing — so
+#101 was unrecoverable and had to be raised again as #102. The work survived; the PR, its review
+threads and its discussion did not.
+
+The safe order costs nothing and is correct whichever way the race falls:
+
+```
+merge feat/18  ─▶  retarget children to main  ─▶  delete feat/18
+                   (PR Edit box, or PATCH base)
+```
+
+If you delete first, check the child is still open rather than assuming it retargeted.
 
 ## The four gates
 
