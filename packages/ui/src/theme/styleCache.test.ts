@@ -47,7 +47,23 @@ describe('style cache', () => {
     ]);
   });
 
-  it('refuses a bound that cannot hold anything', () => {
+  it('caches a value that is itself undefined instead of rebuilding forever', () => {
+    const cache = createStyleCache<number | undefined>();
+    const build = jest.fn(() => undefined);
+
+    cache.get('a', build);
+    cache.get('a', build);
+
+    /* `get() !== undefined` would read the cached undefined as a miss every time. */
+    expect(build).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a capacity that is not a real bound', () => {
     expect(() => createStyleCache(0)).toThrow(RangeError);
+    expect(() => createStyleCache(-1)).toThrow(RangeError);
+    /* Infinity passed the old guard and silently disabled eviction entirely. */
+    expect(() => createStyleCache(Number.POSITIVE_INFINITY)).toThrow(RangeError);
+    expect(() => createStyleCache(Number.NaN)).toThrow(RangeError);
+    expect(() => createStyleCache(2.5)).toThrow(RangeError);
   });
 });

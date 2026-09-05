@@ -23,11 +23,20 @@ export type StyleCache<T> = {
 };
 
 export const createStyleCache = <T>(maxThemes: number = DEFAULT_MAX_THEMES): StyleCache<T> => {
-  if (maxThemes < 1) throw new RangeError('A style cache must retain at least one theme');
+  /* `maxThemes < 1` was not a bound: Infinity passed it, and `size > Infinity` is never true,
+     so eviction never ran and the cache this module exists to bound grew without limit. */
+  if (!Number.isInteger(maxThemes) || maxThemes < 1) {
+    throw new RangeError(
+      `A style cache must retain a whole number of themes, at least one; got ${String(maxThemes)}`,
+    );
+  }
 
   /* Map iterates in insertion order, so re-inserting on a hit makes the first key the
-     least recently used one. That is the whole LRU implementation. */
-  const entries = new Map<string, T>();
+     least recently used one. That is the whole LRU implementation.
+     Values are boxed so a *cached* `undefined` is distinguishable from a miss without a
+     type assertion: an unboxed `get()` returning undefined is ambiguous, and reading it as a
+     miss would rebuild on every call, quietly turning the cache off for that value. */
+  const entries = new Map<string, { readonly value: T }>();
 
   return {
     get: (id, build) => {
@@ -35,17 +44,17 @@ export const createStyleCache = <T>(maxThemes: number = DEFAULT_MAX_THEMES): Sty
       if (hit !== undefined) {
         entries.delete(id);
         entries.set(id, hit);
-        return hit;
+        return hit.value;
       }
 
-      const created = build();
+      const created = { value: build() };
       entries.set(id, created);
 
       if (entries.size > maxThemes) {
         const oldest = entries.keys().next().value;
         if (oldest !== undefined) entries.delete(oldest);
       }
-      return created;
+      return created.value;
     },
     size: () => entries.size,
     keys: () => [...entries.keys()],
