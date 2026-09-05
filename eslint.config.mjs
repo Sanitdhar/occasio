@@ -54,6 +54,8 @@ export default tseslint.config(
       '**/coverage/**',
       '**/.expo/**',
       '**/web-build/**',
+      // Local build scratch (preview exports, mock builders). Gitignored, not source.
+      '.artifacts/**',
       '**/*.tsbuildinfo',
     ],
   },

@@ -23,6 +23,8 @@ export default {
       testMatch: [
         '<rootDir>/packages/*/src/**/*.test.ts',
         '<rootDir>/packages/*/src/**/*.test.tsx',
+        // App-level logic is testable too — navigation ordering is pure and had a real bug.
+        '<rootDir>/apps/*/src/**/*.test.ts',
       ],
       testPathIgnorePatterns: ['\\.contract\\.test\\.'],
       moduleNameMapper,
