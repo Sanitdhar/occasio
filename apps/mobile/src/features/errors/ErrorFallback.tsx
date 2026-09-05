@@ -1,5 +1,6 @@
 import type { ResolvedTheme } from '@occasio/theme';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = {
   readonly theme: ResolvedTheme;
@@ -21,11 +22,22 @@ type Props = {
  */
 export function ErrorFallback({ theme, error, onRetry, showDetail = false }: Props) {
   const { color, type, space, radius, border } = theme;
+  /* SafeAreaProvider only supplies the inset context — something has to consume it, or this
+     renders under a notch or the status bar. Insets are applied as padding rather than by
+     wrapping in SafeAreaView so content still scrolls edge to edge behind the bars. */
+  const insets = useSafeAreaInsets();
 
   return (
     <ScrollView
       style={{ backgroundColor: color.bg }}
-      contentContainerStyle={{ padding: space(6), gap: space(4), flexGrow: 1 }}
+      contentContainerStyle={{
+        paddingTop: space(6) + insets.top,
+        paddingBottom: space(6) + insets.bottom,
+        paddingLeft: space(6) + insets.left,
+        paddingRight: space(6) + insets.right,
+        gap: space(4),
+        flexGrow: 1,
+      }}
     >
       <View style={{ gap: space(2) }}>
         <Text style={{ ...type.overline, color: color.danger }}>SOMETHING BROKE</Text>
