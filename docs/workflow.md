@@ -53,6 +53,65 @@ It does not block merges — `request_changes_workflow` is off, because a solo m
 their own PRs achieves nothing. Treat it as the reviewer you would otherwise not have, not as a
 gate. `@coderabbitai` in a comment will answer questions or re-review.
 
+### The loop every PR goes through (D40)
+
+```
+open PR ──▶ CI (4 gates) ──▶ CodeRabbit review ──▶ triage every finding ──▶ squash-merge
+                                      ▲                     │
+                                      └──── push fixes ─────┘
+```
+
+**Every finding gets one of three responses. None of them is silence.**
+
+| Response          | When                                                         | What it looks like                                                                                    |
+| ----------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| **Fix it**        | The finding is right                                         | Push the fix, then reply on the thread saying what changed and how you verified it                    |
+| **Reply why not** | The finding is wrong, or right but deliberately out of scope | Reply on the thread with the reason. "Out of scope, tracked in #96" is a reason; ignoring it is not   |
+| **Escalate**      | It exposes a decision, not a defect                          | Ask the maintainer. Anything that would change a frozen decision belongs in an issue, not a PR thread |
+
+Do not merge with findings left unanswered. A stale review thread is indistinguishable from one
+nobody read, and six months later nobody can tell which it was.
+
+**Verify before you accept.** A reviewer can be right for the wrong reason, or wrong in a way
+that looks right. On #95 the Metro finding was correct, but checking it showed the real problem
+was worse than described — the override was not merely redundant, it made Metro watch the whole
+repo instead of the four packages Expo detects on its own. Reply with that evidence, not just
+"done".
+
+### Stacked PRs (D41)
+
+Work that depends on unmerged work branches off it rather than off `main`, and targets it as the
+PR base:
+
+```
+main
+ └── feat/17-scaffold-expo-app        PR #95  base: main
+      └── feat/18-root-layout          PR #97  base: feat/17-scaffold-expo-app
+           └── feat/19-route-skeleton  PR #98  base: feat/18-root-layout
+```
+
+Each PR's diff then shows only its own change, so review stays honest even when the work is
+sequential.
+
+**When a PR lower in the stack changes** — a review fix, usually — rebase everything above it:
+
+```bash
+git switch feat/18-root-layout
+git rebase feat/17-scaffold-expo-app
+git push --force-with-lease
+
+git switch feat/19-route-skeleton
+git rebase feat/18-root-layout
+git push --force-with-lease
+```
+
+Always `--force-with-lease`, never `--force`: it refuses to overwrite commits you have not seen,
+which is the difference between rebasing your own stack and silently discarding someone else's
+push.
+
+As each PR merges, GitHub retargets the one above it to `main` automatically. Rebase it once more
+so its diff is clean, and keep going down the stack.
+
 The division of labour is deliberate: the four CI gates catch mechanical failures, and
 CodeRabbit is there for the judgement-level review — the design call that will hurt in three
 months, the case nobody thought to test.
