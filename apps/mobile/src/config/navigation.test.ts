@@ -26,6 +26,13 @@ describe('planTabs', () => {
     ).toEqual(['gossips', 'info', 'tasks']);
   });
 
+  it('survives a config that lists the same tab twice', () => {
+    /* Tenant config is data — a hand-edited row can repeat a key, which would declare the same
+       route twice and collide React keys. */
+    const plan = planTabs(nav({ tabs: ['home', 'schedule', 'home'] }));
+    expect(plan.filter((t) => !t.hidden).map((t) => t.key)).toEqual(['home', 'schedule']);
+  });
+
   it('declares every feature exactly once, however the event is configured', () => {
     const keys = planTabs(nav({ tabs: ['info'] })).map((t) => t.key);
     expect(new Set(keys).size).toBe(keys.length);

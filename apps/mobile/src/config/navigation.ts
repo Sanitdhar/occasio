@@ -36,9 +36,15 @@ export const FIXTURE_NAV: NavConfig = {
   features: { home: true, schedule: true, gossips: true, tasks: true, info: true },
 };
 
-/** The tabs an event actually shows: configured order, minus anything switched off. */
+/**
+ * The tabs an event actually shows: configured order, minus anything switched off.
+ *
+ * Deduplicated first — tenant config is data, and a hand-edited row can list the same tab
+ * twice. That would declare the same route twice and collide React keys, so it is normalised
+ * here rather than trusted.
+ */
 export const visibleTabs = (nav: NavConfig): readonly FeatureKey[] =>
-  nav.tabs.filter((key) => nav.features[key]);
+  [...new Set(nav.tabs)].filter((key) => nav.features[key]);
 
 export type TabPlan = {
   readonly key: FeatureKey;
