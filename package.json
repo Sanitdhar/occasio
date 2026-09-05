@@ -15,6 +15,7 @@
   ],
   "scripts": {
     "build:web": "npm run export:web --workspace @occasio/mobile",
+    "check:reviewed": "node tools/review/check-reviewed.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
