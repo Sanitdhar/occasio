@@ -49,6 +49,8 @@ export default tseslint.config(
   {
     ignores: [
       '**/node_modules/**',
+      // Worktrees are copies of this repo; linting them lints everything twice.
+      '.claude/**',
       '**/dist/**',
       '**/build/**',
       '**/coverage/**',

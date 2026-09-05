@@ -5,3 +5,4 @@ coverage
 *.tsbuildinfo
 .expo
 web-build
+.claude
