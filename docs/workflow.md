@@ -93,15 +93,11 @@ main
 Each PR's diff then shows only its own change, so review stays honest even when the work is
 sequential.
 
-**When a PR lower in the stack changes** — a review fix, usually — rebase everything above it:
+**When a PR lower in the stack changes** — a review fix, usually — rebase everything above it.
+Use `--onto`, and pass the branch the work was originally based on:
 
 ```bash
-git switch feat/18-root-layout
-git rebase feat/17-scaffold-expo-app
-git push --force-with-lease
-
-git switch feat/19-route-skeleton
-git rebase feat/18-root-layout
+git rebase --onto feat/17-scaffold-expo-app feat/17-scaffold-expo-app feat/18-root-layout
 git push --force-with-lease
 ```
 
@@ -109,8 +105,33 @@ Always `--force-with-lease`, never `--force`: it refuses to overwrite commits yo
 which is the difference between rebasing your own stack and silently discarding someone else's
 push.
 
-As each PR merges, GitHub retargets the one above it to `main` automatically. Rebase it once more
-so its diff is clean, and keep going down the stack.
+### Merging a stack, in the order that actually works
+
+PRs here are **squash**-merged, which changes both steps below from the obvious ones. Both of
+these were learned by getting them wrong (#101).
+
+**1. Rebase with `--onto`, not plain `rebase`.** A squash merge replaces the branch's commits
+with one new commit, so the original commits are _not_ ancestors of `main`. `git rebase main`
+tries to replay them and conflicts. `--onto` replays only the commits unique to your branch:
+
+```bash
+# after PR for feat/18 is squash-merged into main
+git fetch origin
+git rebase --onto origin/main feat/18-root-layout feat/19-route-skeleton
+#            └── new base      └── old base        └── branch to move
+git push --force-with-lease
+```
+
+**2. Retarget children _before_ deleting the merged branch.** GitHub **closes** a PR whose base
+branch is deleted — it does not retarget it. A closed PR's base cannot be changed, and it cannot
+be reopened while its base is missing, so the PR is unrecoverable and has to be raised again.
+
+```
+merge feat/18  ─▶  retarget its children to main  ─▶  delete feat/18
+                   (in the PR's Edit box, or PATCH base)
+```
+
+Doing those in the other order is how #101 was lost and had to be reopened as #102.
 
 The division of labour is deliberate: the four CI gates catch mechanical failures, and
 CodeRabbit is there for the judgement-level review — the design call that will hurt in three
