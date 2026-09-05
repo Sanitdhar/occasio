@@ -1,0 +1,35 @@
+# Pinning without updating is not security, it is a snapshot of one afternoon.
+#
+# #106 pinned every action to a full commit SHA with the release tag in a trailing comment.
+# That closed the mutable-tag hole and opened a slower one: a pinned SHA never hears about the
+# CVE fixed three releases later. Dependabot is what turns "pinned" back into "current".
+#
+# Scope is deliberately just `github-actions`. See docs/workflow.md for why npm is not here
+# yet, and for the one pin in CI that Dependabot structurally cannot manage.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    # For this ecosystem the directory is the repo root; Dependabot finds .github/workflows
+    # underneath it, including reusable workflows.
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Etc/UTC
+    # Four actions across two workflows. Grouping them means one PR with one CI run and one
+    # review, instead of four PRs that each rerun all four gates. Security updates are still
+    # opened individually and immediately — grouping only applies to scheduled version updates.
+    groups:
+      actions:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 5
+    labels:
+      - 'area:infra'
+    # PR titles become squashed commit messages and feed the generated release notes (D36),
+    # so they have to be conventional-commit form: `chore(deps): bump ...`.
+    commit-message:
+      prefix: chore
+      include: scope
