@@ -5,6 +5,7 @@
     "lib": ["ES2023"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
 
     /* D16 — maximum strictness. Every flag here catches a class of real bug. */
     "strict": true,

@@ -10,16 +10,11 @@ export {
   onColorFor,
   rotateHue,
   withAlpha,
-} from './color.js';
-export { PRESETS, themeInputFromPreset, type Preset } from './presets/index.js';
-export { pickScheme, resolveTheme } from './resolve.js';
-export {
-  runThemeChecks,
-  type CheckStatus,
-  type ThemeCheck,
-  type ThemeCheckReport,
-} from './checks.js';
-export { TYPE_SETS, buildTypography } from './typography.js';
+} from './color';
+export { PRESETS, themeInputFromPreset, type Preset } from './presets/index';
+export { pickScheme, resolveTheme } from './resolve';
+export { runThemeChecks, type CheckStatus, type ThemeCheck, type ThemeCheckReport } from './checks';
+export { TYPE_SETS, buildTypography } from './typography';
 export {
   PRESET_IDS,
   ThemeInputSchema,
@@ -34,6 +29,6 @@ export {
   type ThemeInput,
   type ThemeTypography,
   type TypeSetId,
-} from './types.js';
+} from './types';
 
 export const THEME_SCHEMA_VERSION = 1 as const;

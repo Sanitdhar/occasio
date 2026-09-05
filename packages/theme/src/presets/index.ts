@@ -1,4 +1,4 @@
-import type { PresetId, ThemeInput } from '../types.js';
+import type { PresetId, ThemeInput } from '../types';
 
 /**
  * Presets are the primary admin UI (D7, D10): most people pick one and change the seed colour,

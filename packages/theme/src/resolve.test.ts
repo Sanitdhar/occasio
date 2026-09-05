@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
-import { themeInputFromPreset } from './presets/index.js';
-import { pickScheme, resolveTheme } from './resolve.js';
-import type { ThemeInput } from './types.js';
+import { themeInputFromPreset } from './presets/index';
+import { pickScheme, resolveTheme } from './resolve';
+import type { ThemeInput } from './types';
 
 const romantic = themeInputFromPreset('romantic', '#7C3A5A');
 const conference = themeInputFromPreset('conference', '#2B6CB0');

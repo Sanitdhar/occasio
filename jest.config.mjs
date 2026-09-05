@@ -8,7 +8,6 @@
 const moduleNameMapper = {
   '^@occasio/([^/]+)$': '<rootDir>/packages/$1/src/index.ts',
   '^@occasio/([^/]+)/(.*)$': '<rootDir>/packages/$1/src/$2',
-  '^(\\.{1,2}/.*)\\.js$': '$1',
 };
 
 const transform = {

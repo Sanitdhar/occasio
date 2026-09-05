@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { sessionId, tenantId, type TenantId } from './ids.js';
+import { sessionId, tenantId, type TenantId } from './ids';
 
 describe('branded ids', () => {
   it('carries the underlying string through unchanged at runtime', () => {

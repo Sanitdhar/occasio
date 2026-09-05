@@ -1,8 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
-import { contrast } from './color.js';
-import { themeInputFromPreset } from './presets/index.js';
-import { resolveTheme } from './resolve.js';
-import { PRESET_IDS, type PresetId, type Scheme } from './types.js';
+import { contrast } from './color';
+import { themeInputFromPreset } from './presets/index';
+import { resolveTheme } from './resolve';
+import { PRESET_IDS, type PresetId, type Scheme } from './types';
 
 /**
  * This is the single highest-value test in the repo.

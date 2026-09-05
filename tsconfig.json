@@ -13,5 +13,11 @@
       "@occasio/ui/*": ["packages/ui/src/*"]
     }
   },
-  "include": ["packages/*/src/**/*", "apps/*/src/**/*", "apps/*/app/**/*", "tools/**/*.ts"]
+  "include": [
+    "packages/*/src/**/*",
+    "apps/*/src/**/*",
+    "apps/*/app/**/*",
+    "apps/*/*.d.ts",
+    "tools/**/*.ts"
+  ]
 }

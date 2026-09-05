@@ -45,6 +45,7 @@
     "typescript-eslint": "^8.46.0"
   },
   "overrides": {
-    "handlebars": "^4.7.9"
+    "handlebars": "^4.7.9",
+    "react-native": "0.86.3"
   }
 }
