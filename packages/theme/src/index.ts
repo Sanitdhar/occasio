@@ -1,8 +1,39 @@
-/**
- * The theming engine (D7, D10) — resolves a tenant's ~25-field ThemeInput into ~150
- * contrast-guaranteed tokens. Implemented in build-order step 2, before any UI exists,
- * because it is the riskiest part of the system and the easiest to test in isolation.
- *
- * See docs/decisions.md and the design doc for the token model.
- */
+export {
+  buildNeutralRamp,
+  buildRamp,
+  chromaOf,
+  contrast,
+  ensureContrast,
+  hueOf,
+  isAchromatic,
+  mix,
+  onColorFor,
+  rotateHue,
+  withAlpha,
+} from './color.js';
+export { PRESETS, themeInputFromPreset, type Preset } from './presets/index.js';
+export { pickScheme, resolveTheme } from './resolve.js';
+export {
+  runThemeChecks,
+  type CheckStatus,
+  type ThemeCheck,
+  type ThemeCheckReport,
+} from './checks.js';
+export { TYPE_SETS, buildTypography } from './typography.js';
+export {
+  PRESET_IDS,
+  ThemeInputSchema,
+  TYPE_SET_IDS,
+  type PresetId,
+  type Ramp,
+  type ResolveContext,
+  type ResolvedTheme,
+  type Scheme,
+  type TextStyleToken,
+  type ThemeColors,
+  type ThemeInput,
+  type ThemeTypography,
+  type TypeSetId,
+} from './types.js';
+
 export const THEME_SCHEMA_VERSION = 1 as const;

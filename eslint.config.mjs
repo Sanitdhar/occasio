@@ -73,6 +73,9 @@ export default tseslint.config(
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
       ],
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
+      /* `type`, not `interface`. Zod-inferred types, unions and the 12-tuple Ramp cannot be
+         interfaces, so enforcing `interface` would guarantee a codebase that mixes both. */
+      '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
