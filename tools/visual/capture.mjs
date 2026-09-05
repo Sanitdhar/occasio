@@ -52,56 +52,79 @@ const run = async () => {
   const failures = [];
   let shots = 0;
 
-  for (const viewport of VIEWPORTS) {
-    for (const scheme of SCHEMES) {
-      const context = await browser.newContext({
-        viewport: { width: viewport.width, height: viewport.height },
-        colorScheme: scheme,
-        deviceScaleFactor: 2,
-        reducedMotion: 'reduce',
-      });
-      for (const [path, name] of ROUTES) {
-        const page = await context.newPage();
-        const problems = [];
-        page.on('pageerror', (e) => problems.push(`threw: ${String(e).slice(0, 160)}`));
-        page.on('console', (m) => {
-          if (m.type() === 'error') problems.push(`console: ${m.text().slice(0, 160)}`);
+  try {
+    for (const viewport of VIEWPORTS) {
+      for (const scheme of SCHEMES) {
+        const context = await browser.newContext({
+          viewport: { width: viewport.width, height: viewport.height },
+          colorScheme: scheme,
+          deviceScaleFactor: 2,
+          reducedMotion: 'reduce',
         });
-        await page.goto(`http://127.0.0.1:${String(server.port)}${path}`, {
-          waitUntil: 'networkidle',
-        });
-        await page.waitForTimeout(400);
+        try {
+          for (const [path, name] of ROUTES) {
+            const page = await context.newPage();
+            const problems = [];
+            page.on('pageerror', (e) => problems.push(`threw: ${String(e).slice(0, 160)}`));
+            page.on('console', (m) => {
+              if (m.type() === 'error') problems.push(`console: ${m.text().slice(0, 160)}`);
+            });
 
-        const text = (
-          await page
-            .locator('body')
-            .innerText()
-            .catch(() => '')
-        ).trim();
-        if (text.length < 10) problems.push(`rendered ${String(text.length)} chars of text`);
+            /* A route that fails to navigate is a finding, not a reason to abandon the run.
+               Aborting here would leave later routes uncaptured, the manifest unwritten and
+               the browser and server leaked -- and would report one failure while hiding the
+               rest, which is the least useful way for a gate to fail. */
+            try {
+              await page.goto(`http://127.0.0.1:${String(server.port)}${path}`, {
+                waitUntil: 'networkidle',
+                timeout: 30_000,
+              });
+              await page.waitForTimeout(400);
 
-        const file = join(OUT, `${name}-${viewport.name}-${scheme}.png`);
-        await page.screenshot({ path: file });
-        shots += 1;
-        if (problems.length > 0)
-          failures.push(`${path} [${viewport.name}/${scheme}] ${problems[0]}`);
-        await page.close();
+              const text = (
+                await page
+                  .locator('body')
+                  .innerText()
+                  .catch(() => '')
+              ).trim();
+              if (text.length < 10) problems.push(`rendered ${String(text.length)} chars of text`);
+
+              await page.screenshot({ path: join(OUT, `${name}-${viewport.name}-${scheme}.png`) });
+              shots += 1;
+            } catch (error) {
+              problems.push(`navigation failed: ${String(error).slice(0, 160)}`);
+            } finally {
+              await page.close();
+            }
+
+            if (problems.length > 0) {
+              failures.push(`${path} [${viewport.name}/${scheme}] ${problems[0]}`);
+            }
+          }
+        } finally {
+          await context.close();
+        }
       }
-      await context.close();
     }
+  } finally {
+    await browser.close();
+    await server.close();
+    writeFileSync(
+      join(OUT, 'manifest.json'),
+      JSON.stringify(
+        {
+          routes: ROUTES.length,
+          viewports: VIEWPORTS.length,
+          schemes: SCHEMES.length,
+          expected: ROUTES.length * VIEWPORTS.length * SCHEMES.length,
+          shots,
+          failures,
+        },
+        null,
+        2,
+      ),
+    );
   }
-
-  await browser.close();
-  await server.close();
-
-  writeFileSync(
-    join(OUT, 'manifest.json'),
-    JSON.stringify(
-      { routes: ROUTES.length, viewports: VIEWPORTS.length, schemes: SCHEMES.length, shots },
-      null,
-      2,
-    ),
-  );
 
   console.log(`captured ${String(shots)} screenshots into ${OUT}`);
   if (failures.length > 0) {
