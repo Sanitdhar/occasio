@@ -1,6 +1,6 @@
+import { useTheme } from '@occasio/ui';
 import { Tabs } from 'expo-router';
 import { FIXTURE_NAV, NON_TAB_ROUTES, planTabs } from '../../../../src/config/navigation';
-import { useScaffoldTheme } from '../../../../src/theme/useScaffoldTheme';
 
 /**
  * The attendee tab bar is generated from tenant config (D2), never hardcoded: a conference
@@ -12,7 +12,7 @@ import { useScaffoldTheme } from '../../../../src/theme/useScaffoldTheme';
  * screens renderable inside the theme editor's preview).
  */
 export default function AttendeeTabsLayout() {
-  const theme = useScaffoldTheme();
+  const theme = useTheme();
 
   return (
     <Tabs

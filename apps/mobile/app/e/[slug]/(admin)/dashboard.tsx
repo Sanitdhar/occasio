@@ -1,10 +1,10 @@
+import { useTheme } from '@occasio/ui';
 import { PlaceholderScreen } from '../../../../src/features/placeholder/PlaceholderScreen';
-import { useAppTheme } from '../../../../src/theme/useScaffoldTheme';
 
 export default function Route() {
   return (
     <PlaceholderScreen
-      theme={useAppTheme()}
+      theme={useTheme()}
       eyebrow="ADMIN"
       title="Dashboard"
       description="Pending gossips, sessions today, and what needs attention."

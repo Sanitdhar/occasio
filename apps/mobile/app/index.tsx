@@ -1,17 +1,26 @@
-import { resolveTheme, themeInputFromPreset } from '@occasio/theme';
+import { ThemeProvider, useTheme } from '@occasio/ui';
 import { ScaffoldScreen } from '../src/features/scaffold/ScaffoldScreen';
+import { FIXTURE_TENANT_THEME } from '../src/theme/inputs';
+import { useDeviceScheme } from '../src/theme/useDeviceScheme';
+
+/** Reads the nearest theme and hands it to a screen that stays pure. */
+function Scaffold() {
+  return <ScaffoldScreen theme={useTheme()} />;
+}
 
 /**
  * Route files are adapters: they read params, compose providers, and render a screen.
  *
- * Resolving the theme here stands in for `<ThemeProvider>`, which arrives with #22. Once it
- * exists this becomes a provider wrapping the same screen, and the screen itself does not
- * change — which is the point of keeping it pure.
+ * This one nests a second ThemeProvider, so the screen below renders under an event's theme
+ * while the app around it stays on the console theme from the root layout. That is exactly the
+ * mechanism the theme editor's live preview will use — and because it is a real route, the
+ * visual gate screenshots it on every run.
  */
 export default function IndexRoute() {
-  const theme = resolveTheme(themeInputFromPreset('romantic', '#7C3A5A'), {
-    forceScheme: 'light',
-  });
-
-  return <ScaffoldScreen theme={theme} />;
+  const systemScheme = useDeviceScheme();
+  return (
+    <ThemeProvider input={FIXTURE_TENANT_THEME} systemScheme={systemScheme}>
+      <Scaffold />
+    </ThemeProvider>
+  );
 }

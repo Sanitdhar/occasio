@@ -1,12 +1,10 @@
+import { ThemeProvider, useTheme } from '@occasio/ui';
 import { Stack } from 'expo-router';
-import { useAppTheme } from '../../src/theme/useScaffoldTheme';
+import { APP_THEME } from '../../src/theme/inputs';
+import { useDeviceScheme } from '../../src/theme/useDeviceScheme';
 
-/**
- * Super admin sits OUTSIDE e/[slug] on purpose: it is cross-tenant, so it must never inherit
- * an event's theme or be reachable through an event's route tree.
- */
-export default function SuperAdminLayout() {
-  const theme = useAppTheme();
+function Chrome() {
+  const theme = useTheme();
   return (
     <Stack
       screenOptions={{
@@ -15,5 +13,18 @@ export default function SuperAdminLayout() {
         contentStyle: { backgroundColor: theme.color.bg },
       }}
     />
+  );
+}
+
+/**
+ * Super admin sits outside e/[slug] on purpose -- it is cross-tenant, so it must never
+ * inherit an event theme or be reachable through an event route tree.
+ */
+export default function AdminLayout() {
+  const systemScheme = useDeviceScheme();
+  return (
+    <ThemeProvider input={APP_THEME} systemScheme={systemScheme}>
+      <Chrome />
+    </ThemeProvider>
   );
 }
