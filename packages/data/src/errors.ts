@@ -126,6 +126,11 @@ export class ValidationError extends DataError {
 /**
  * The narrowing helpers. `catch` hands over `unknown`, and without these the only way to reach a
  * field is a cast, which lint forbids outside two files.
+ *
+ * `isDataError` widens to the three subclasses by hand rather than to `DataError`, so that
+ * `error.code` narrows the union and reaches `issues` or `tenantId`. A fourth error type has to
+ * be added to that union as well as to `DATA_ERROR_CODES` — which is the point at which someone
+ * has to think about how screens render it.
  */
 export const isDataError = (
   error: unknown,
