@@ -1,23 +1,18 @@
 import { Tabs } from 'expo-router';
-import {
-  FEATURE_KEYS,
-  FIXTURE_NAV,
-  TAB_ROUTES,
-  visibleTabs,
-} from '../../../../src/config/navigation';
+import { FIXTURE_NAV, planTabs } from '../../../../src/config/navigation';
 import { useScaffoldTheme } from '../../../../src/theme/useScaffoldTheme';
 
 /**
  * The attendee tab bar is generated from tenant config (D2), never hardcoded: a conference
  * switches gossips off, a wedding drops tasks, and neither is a code change.
  *
- * Tabs are declared for every configured feature and hidden — rather than omitted — when a
- * feature is off, because expo-router still needs the route to exist for deep links into it to
- * resolve rather than 404.
+ * The route stays an adapter — the ordering and enabled/disabled logic lives in `planTabs`,
+ * which is pure and tested. `<Tabs.Screen>` construction has to stay here rather than moving to
+ * features/, because features are forbidden from importing expo-router (that ban is what keeps
+ * screens renderable inside the theme editor's preview).
  */
 export default function AttendeeTabsLayout() {
   const theme = useScaffoldTheme();
-  const shown = visibleTabs(FIXTURE_NAV);
 
   return (
     <Tabs
@@ -31,21 +26,13 @@ export default function AttendeeTabsLayout() {
         },
       }}
     >
-      {FEATURE_KEYS.map((key) => {
-        const route = TAB_ROUTES[key];
-        /* `href: null` hides a tab without removing the route, so a deep link into a disabled
-           feature still resolves instead of 404ing. Options are built conditionally rather
-           than passing `href: undefined`, which exactOptionalPropertyTypes rejects. */
-        return (
-          <Tabs.Screen
-            key={key}
-            name={route.name}
-            options={
-              shown.includes(key) ? { title: route.title } : { title: route.title, href: null }
-            }
-          />
-        );
-      })}
+      {planTabs(FIXTURE_NAV).map((tab) => (
+        <Tabs.Screen
+          key={tab.key}
+          name={tab.name}
+          options={tab.hidden ? { title: tab.title, href: null } : { title: tab.title }}
+        />
+      ))}
     </Tabs>
   );
 }

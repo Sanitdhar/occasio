@@ -39,3 +39,33 @@ export const FIXTURE_NAV: NavConfig = {
 /** The tabs an event actually shows: configured order, minus anything switched off. */
 export const visibleTabs = (nav: NavConfig): readonly FeatureKey[] =>
   nav.tabs.filter((key) => nav.features[key]);
+
+export type TabPlan = {
+  readonly key: FeatureKey;
+  readonly name: string;
+  readonly title: string;
+  /** Hidden tabs are still declared so a deep link into a disabled feature resolves. */
+  readonly hidden: boolean;
+};
+
+/**
+ * The ordered list of tabs to declare.
+ *
+ * Order comes from `nav.tabs`, not from `FEATURE_KEYS` — an event that lists schedule before
+ * home must get schedule first, and `href: null` hides a tab without reordering it. Disabled
+ * features are appended after the visible ones so they remain routable but never affect the
+ * order of what is on screen.
+ *
+ * Pure and separately tested, because getting this wrong silently produces the right tabs in
+ * the wrong sequence, which no type check would catch.
+ */
+export const planTabs = (nav: NavConfig): readonly TabPlan[] => {
+  const shown = visibleTabs(nav);
+  const hidden = FEATURE_KEYS.filter((key) => !shown.includes(key));
+  return [...shown, ...hidden].map((key) => ({
+    key,
+    name: TAB_ROUTES[key].name,
+    title: TAB_ROUTES[key].title,
+    hidden: !shown.includes(key),
+  }));
+};
