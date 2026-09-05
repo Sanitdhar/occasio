@@ -62,6 +62,7 @@ Decisions with enough consequence to need their own reasoning have an [ADR](adr/
 
 | #   | Decision                                                                                                                                                                                                                                                     |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D39 | The repo lives in the **`dharlabs` org**, with Sanit and Sourav both as owners, so ownership is not tied to one personal account and both can be assigned work. (`dhar` was already taken)                                                                   |
 | D38 | **CodeRabbit** reviews every PR, and the repo is **public** — which makes CodeRabbit free forever and GitHub Actions minutes unlimited. `.coderabbit.yaml` teaches it the frozen decisions so it reviews for this codebase rather than giving generic advice |
 | D34 | **Trunk-based branching.** Short-lived branches off `main`, squash-merged and deleted. `main` is always releasable                                                                                                                                           |
 | D35 | **One PR per issue** — issues are scoped to be reviewable in one sitting. A PR that outgrows its issue gets split, not explained                                                                                                                             |
@@ -69,7 +70,7 @@ Decisions with enough consequence to need their own reasoning have an [ADR](adr/
 | D37 | **Six milestones**, each ending in something you can open in a browser and show someone                                                                                                                                                                      |
 
 See [workflow.md](workflow.md) for how this works day to day, and the
-[roadmap board](https://github.com/users/Sanitdhar/projects/1) for the issues themselves.
+[roadmap board](https://github.com/orgs/dharlabs/projects/1) for the issues themselves.
 
 ## Still open
 

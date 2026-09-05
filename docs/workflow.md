@@ -67,8 +67,8 @@ months, the case nobody thought to test.
 | `web-build` | Metro and platform-split mistakes                      |
 
 `visual` and `web-build` currently pass without doing real work — their scripts arrive with
-[#5](https://github.com/Sanitdhar/occasio/issues/5) and
-[#4](https://github.com/Sanitdhar/occasio/issues/4). Until then, treat their green ticks as
+[#5](https://github.com/dharlabs/occasio/issues/5) and
+[#4](https://github.com/dharlabs/occasio/issues/4). Until then, treat their green ticks as
 meaning nothing.
 
 ## Releases
@@ -96,7 +96,7 @@ not feature completeness.
 
 ## The board
 
-[Occasio Roadmap](https://github.com/users/Sanitdhar/projects/1) holds every issue. Sixteen epics
+[Occasio Roadmap](https://github.com/orgs/dharlabs/projects/1) holds every issue. Sixteen epics
 group the work; each epic issue carries a checklist of its children and lives in the milestone
 that ships it.
 

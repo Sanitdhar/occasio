@@ -53,6 +53,6 @@ Branch off `main`, one PR per issue, squash-merge, delete the branch. Convention
 the release notes are generated from those. Run `npm run verify` before pushing; CI runs the same
 gates and will not merge without them.
 
-Pick something to work on from the [roadmap board](https://github.com/users/Sanitdhar/projects/1).
+Pick something to work on from the [roadmap board](https://github.com/orgs/dharlabs/projects/1).
 Issues are scoped so `size:M` is about a day. The full process, including how releases are cut,
 is in [docs/workflow.md](docs/workflow.md).
