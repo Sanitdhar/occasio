@@ -33,3 +33,6 @@ blob-report/
 
 # Expo web export output
 apps/*/dist/
+
+# Agent worktrees live here
+.claude/

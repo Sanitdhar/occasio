@@ -19,5 +19,6 @@
     "apps/*/app/**/*",
     "apps/*/*.d.ts",
     "tools/**/*.ts"
-  ]
+  ],
+  "exclude": [".claude", "node_modules"]
 }

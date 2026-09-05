@@ -16,6 +16,11 @@ const transform = {
 
 export default {
   passWithNoTests: true,
+  /* Agent worktrees are created at .claude/worktrees/<name>/, inside the repo. Each contains a
+     full copy of every workspace package, so Metro's Haste map — which Jest shares — finds
+     several modules claiming the name `@occasio/theme` and refuses to resolve any of them.
+     Invisible until someone runs a git worktree, then it breaks every suite at once. */
+  modulePathIgnorePatterns: ['<rootDir>/.claude/'],
   projects: [
     {
       displayName: 'unit',
