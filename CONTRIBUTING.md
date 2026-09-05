@@ -46,7 +46,13 @@ and did nothing at all until a probe caught them.
 - Every data call takes `tenantId` explicitly, even when it could be inferred from context.
   That mirrors how row-level security works and prevents cross-tenant leaks later.
 
-## Commits and PRs
+## How work moves
 
-Conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`). Run `npm run verify`
-before pushing — CI runs the same gates and will not merge without them.
+Branch off `main`, one PR per issue, squash-merge, delete the branch. Conventional commit titles
+(`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`) — the PR title becomes the squashed commit and
+the release notes are generated from those. Run `npm run verify` before pushing; CI runs the same
+gates and will not merge without them.
+
+Pick something to work on from the [roadmap board](https://github.com/users/Sanitdhar/projects/1).
+Issues are scoped so `size:M` is about a day. The full process, including how releases are cut,
+is in [docs/workflow.md](docs/workflow.md).

@@ -64,11 +64,27 @@ by lint, not by convention.
 | `npm run test:contracts`     | One shared suite run against every adapter         |
 | `npm run verify`             | All of the above                                   |
 
+## Roadmap
+
+Six milestones, each ending in something you can open in a browser and show someone. Every issue
+lives on the [roadmap board](https://github.com/users/Sanitdhar/projects/1).
+
+|                        |                                              |
+| ---------------------- | -------------------------------------------- |
+| **v0.1 Foundations**   | app shell, themed primitives, data layer     |
+| **v0.2 Attendee site** | tenancy, sign-in, schedule, directions       |
+| **v0.3 Participation** | gossips, RSVP, tasks, gallery, reminders     |
+| **v0.4 Admin console** | theme editor, schedule editor, media, people |
+| **v0.5 Platform**      | super admin, announcements, offline          |
+| **v1.0 Public beta**   | deploy, visual baselines, native pass        |
+
+`v1.0.0` means a real event has run on this — not feature completeness.
+
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). The short version: decisions live in
-[docs/decisions.md](docs/decisions.md), and every convention is enforced by a rule rather than
-by review.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/workflow.md](docs/workflow.md). The short
+version: decisions live in [docs/decisions.md](docs/decisions.md), every convention is enforced by
+a rule rather than by review, and it's one PR per issue.
 
 ## Licence
 
