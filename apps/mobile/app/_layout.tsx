@@ -1,19 +1,71 @@
-import { Stack } from 'expo-router';
+import { resolveTheme, themeInputFromPreset } from '@occasio/theme';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ErrorFallback } from '../src/features/errors/ErrorFallback';
 
 /**
- * The root layout is an adapter, not a screen: it composes providers and hands off to routes.
+ * Query defaults tuned for an event, not a dashboard.
  *
- * Providers arrive as their epics land — the theme provider with #22, tenant resolution with
- * the tenancy epic, session with identity. Screens stay pure so the theme editor can render
- * them under an overridden provider later.
+ * Attendees are standing in venues with bad signal, so a failed request retries twice rather
+ * than giving up immediately, and data stays fresh for a minute so moving between the schedule
+ * and a session does not refetch on every tap. Refetch-on-focus is off: a phone coming out of a
+ * pocket should show what it already has, instantly.
  */
-export default function RootLayout() {
+const queryDefaults = {
+  queries: {
+    staleTime: 60_000,
+    gcTime: 30 * 60_000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  },
+} as const;
+
+/**
+ * expo-router renders this instead of the white screen of death when a route throws.
+ *
+ * It resolves a theme directly because `<ThemeProvider>` does not exist yet (#22) — and because
+ * an error boundary that depends on a provider is useless exactly when that provider is what
+ * failed. This one keeps working regardless.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const theme = resolveTheme(themeInputFromPreset('minimal', '#7C3A5A'), { forceScheme: 'light' });
   return (
     <SafeAreaProvider>
-      <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }} />
+      <ErrorFallback
+        theme={theme}
+        /* expo-router's retry() is async; the fallback wants a void handler, and letting the
+           promise float would swallow a second failure silently. */
+        onRetry={() => void retry()}
+        error={error}
+        showDetail={__DEV__}
+      />
     </SafeAreaProvider>
+  );
+}
+
+/**
+ * The root layout composes providers and nothing else — no data fetching, no business logic.
+ *
+ * Providers arrive as their epics land: the theme provider with #22, tenant resolution and
+ * session with the v0.2 milestone. Screens stay pure so the theme editor can render them under
+ * an overridden provider later.
+ */
+export default function RootLayout() {
+  // Created once per app instance rather than per render, so the cache is not thrown away.
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: queryDefaults }));
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <StatusBar style="auto" />
+          <Stack screenOptions={{ headerShown: false }} />
+        </SafeAreaProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
