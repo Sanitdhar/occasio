@@ -48,6 +48,20 @@ const CASES = [
     code: "export const s = { card: { backgroundColor: '#fff', padding: 16, margin: 0 } };\n",
   },
   {
+    label: 'ELEV raw shadow props are banned in components',
+    file: 'packages/ui/src/__enforcement_probe_shadow.ts',
+    rule: 'occasio/no-raw-shadow-props',
+    shouldFire: true,
+    code: "export const s = { card: { shadowColor: 'x', shadowRadius: 4, elevation: 2 } };\n",
+  },
+  {
+    label: 'ELEV the elevation translator IS allowed to use them',
+    file: 'packages/ui/src/theme/elevation__enforcement_probe.ts',
+    rule: 'occasio/no-raw-shadow-props',
+    shouldFire: false,
+    code: "export const s = { shadowColor: 'x' };\n",
+  },
+  {
     label: 'D29  supabase is banned outside its adapter',
     file: 'packages/data/src/__enforcement_probe_sb.ts',
     rule: 'no-restricted-imports',

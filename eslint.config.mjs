@@ -205,11 +205,22 @@ export default tseslint.config(
     rules: { 'no-console': 'off' },
   },
 
-  /* D17 — literal colours and spacing are errors wherever styles are written. */
+  /* D17 — literal colours and spacing are errors wherever styles are written, and shadows come
+     from the theme rather than from hand-written platform props. */
   {
     files: ['packages/ui/**', 'apps/**'],
     plugins: { occasio },
-    rules: { 'occasio/no-literal-style-values': 'error' },
+    rules: {
+      'occasio/no-literal-style-values': 'error',
+      'occasio/no-raw-shadow-props': 'error',
+    },
+  },
+
+  /* The two files whose entire job is translating an elevation spec into platform shadow
+     properties. Everything else goes through them. */
+  {
+    files: ['packages/ui/src/theme/elevation*.ts'],
+    rules: { 'occasio/no-raw-shadow-props': 'off' },
   },
 
   /* Mappers are where row shapes meet domain shapes, and ids.ts is where a plain string

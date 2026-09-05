@@ -9,7 +9,14 @@ import {
 } from './color';
 import { PRESETS } from './presets/index';
 import { buildTypography } from './typography';
-import type { ResolveContext, ResolvedTheme, Scheme, ThemeColors, ThemeInput } from './types';
+import type {
+  ElevationSpec,
+  ResolveContext,
+  ResolvedTheme,
+  Scheme,
+  ThemeColors,
+  ThemeInput,
+} from './types';
 
 /**
  * resolveTheme is PURE, SYNCHRONOUS and DETERMINISTIC: the same input always produces the same
@@ -46,6 +53,25 @@ const SCRIM_STRENGTH: Record<ThemeInput['imagery']['scrim'], number> = {
   auto: 0.55,
   heavy: 0.78,
 };
+
+/**
+ * Elevation is deliberately sparse.
+ *
+ * The design language separates surfaces with tone and hairline borders, not shadows -- shadows
+ * are the fastest route to a dated look and render inconsistently across platforms. These four
+ * levels exist for things that genuinely float above the page: sheets, menus, a dragged card.
+ * Everything else should use `surface` versus `surfaceRaised`.
+ */
+const ELEVATION_STEPS = {
+  none: { y: 0, blur: 0, spread: 0, opacity: 0, android: 0 },
+  sm: { y: 1, blur: 3, spread: 0, opacity: 0.1, android: 2 },
+  md: { y: 4, blur: 12, spread: -2, opacity: 0.14, android: 6 },
+  lg: { y: 12, blur: 28, spread: -6, opacity: 0.2, android: 12 },
+} as const;
+
+/* A shadow on a dark surface is nearly invisible at light-mode opacities, so it is deepened
+   rather than dropped -- the alternative is levels that silently do nothing in dark mode. */
+const DARK_SHADOW_BOOST = 1.9;
 
 const MOTION_TIMINGS: Record<
   ThemeInput['motion']['level'],
@@ -167,6 +193,16 @@ export const resolveTheme = (input: ThemeInput, context: ResolveContext = {}): R
   const scrimBase = mix('#000000', brand[11], 0.28);
   const scrimAlpha = SCRIM_STRENGTH[input.imagery.scrim];
 
+  /* Tinted toward the brand's darkest step rather than pure black: a shadow that belongs to
+     the palette reads as part of the design, not as a generic drop shadow. */
+  const shadowColor = mix('#000000', brand[11], 0.22);
+  const shadowScale = scheme === 'dark' ? DARK_SHADOW_BOOST : 1;
+  const elevationLevel = (step: Omit<ElevationSpec, 'color'>): ElevationSpec => ({
+    ...step,
+    opacity: Math.min(1, Number((step.opacity * shadowScale).toFixed(3))),
+    color: shadowColor,
+  });
+
   return {
     id: hashTheme(input, scheme),
     scheme,
@@ -176,6 +212,12 @@ export const resolveTheme = (input: ThemeInput, context: ResolveContext = {}): R
     space: (steps: number): number => Math.round(steps * BASE_SPACE * densityFactor),
     radius: radii,
     border: { hairline: 1, standard: 2 },
+    elevation: {
+      none: elevationLevel(ELEVATION_STEPS.none),
+      sm: elevationLevel(ELEVATION_STEPS.sm),
+      md: elevationLevel(ELEVATION_STEPS.md),
+      lg: elevationLevel(ELEVATION_STEPS.lg),
+    },
     image: {
       heroAspect: HERO_ASPECT[input.imagery.heroAspect],
       radius: radii.hero,
