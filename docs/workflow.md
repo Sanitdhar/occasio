@@ -176,13 +176,13 @@ A tag is mutable, so an unpinned action runs whatever was pushed there last. A S
 The cost of that is a pin with no expiry: it stays at whatever was current the day somebody
 wrote it, security fixes included. [`.github/dependabot.yml`](../.github/dependabot.yml) is what
 closes that half of the trade for the actions. It watches the `github-actions` ecosystem weekly,
-bumps the SHA, and rewrites the trailing `# v4` comment so the comment cannot drift into a lie.
-All four actions are grouped into one PR — one review, one CI run. Security updates are exempt
-from grouping and arrive on their own, immediately.
+bumps the SHA, and — when the new SHA maps to a tag — rewrites the trailing `# v4` comment with
+it. All four actions are grouped into one PR: one review, one CI run. Security updates are
+exempt from grouping and arrive on their own, immediately.
 
-Read the group PR rather than rubber-stamping it. Dependabot rewrites the version comment only
-when the SHA it lands on is a tagged release; when it is not, the SHA moves and the comment does
-not.
+Read the group PR rather than rubber-stamping it, and check both halves of every pin. When
+Dependabot lands on a commit that carries no tag, the SHA moves and the comment stays where it
+was — which is worse than a stale pin, because it is a stale pin that reads as a current one.
 
 ### The Playwright pin moves by hand, and never alone
 
@@ -209,10 +209,13 @@ Bump both in a single PR:
 ```bash
 npm install --save-exact --save-dev playwright@1.64.0
 
-# The digest the registry serves for the matching image tag:
-curl -sSI -H 'Accept: application/vnd.oci.image.index.v1+json' \
+# The digest the registry serves for the matching image tag. Prints `sha256:…` and nothing
+# else: HTTP headers end in CRLF, and a stray carriage return pasted into ci.yml is a pin
+# that looks right and resolves to nothing.
+curl -fsSI -H 'Accept: application/vnd.oci.image.index.v1+json' \
   https://mcr.microsoft.com/v2/playwright/manifests/v1.64.0-noble |
-  grep -i docker-content-digest
+  tr -d '\r' |
+  awk -F': ' 'tolower($1) == "docker-content-digest" { print $2; exit }'
 ```
 
 Paste that digest into `ci.yml`'s `image:`, update the version named in the comment above it,
