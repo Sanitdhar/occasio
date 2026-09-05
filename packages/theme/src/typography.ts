@@ -1,4 +1,4 @@
-import type { TextStyleToken, ThemeInput, ThemeTypography, TypeSetId } from './types.js';
+import type { TextStyleToken, ThemeInput, ThemeTypography, TypeSetId } from './types';
 
 /**
  * Curated typography sets (D10).

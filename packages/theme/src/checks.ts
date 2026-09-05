@@ -1,7 +1,7 @@
-import { chromaOf, contrast, hueOf, isAchromatic } from './color.js';
-import { PRESETS } from './presets/index.js';
-import { resolveTheme } from './resolve.js';
-import type { ResolveContext, Scheme, ThemeInput } from './types.js';
+import { chromaOf, contrast, hueOf, isAchromatic } from './color';
+import { PRESETS } from './presets/index';
+import { resolveTheme } from './resolve';
+import type { ResolveContext, Scheme, ThemeInput } from './types';
 
 /**
  * The "Checks" panel in the theme editor (D10).

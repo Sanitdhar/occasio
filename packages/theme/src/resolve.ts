@@ -6,10 +6,10 @@ import {
   onColorFor,
   rotateHue,
   withAlpha,
-} from './color.js';
-import { PRESETS } from './presets/index.js';
-import { buildTypography } from './typography.js';
-import type { ResolveContext, ResolvedTheme, Scheme, ThemeColors, ThemeInput } from './types.js';
+} from './color';
+import { PRESETS } from './presets/index';
+import { buildTypography } from './typography';
+import type { ResolveContext, ResolvedTheme, Scheme, ThemeColors, ThemeInput } from './types';
 
 /**
  * resolveTheme is PURE, SYNCHRONOUS and DETERMINISTIC: the same input always produces the same

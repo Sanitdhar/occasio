@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Occasio",
+    "slug": "occasio",
+    "scheme": "occasio",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router"],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.dharlabs.occasio"
+    },
+    "android": {
+      "package": "dev.dharlabs.occasio"
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { clampChroma, formatHex, oklch, parse, wcagContrast } from 'culori';
-import type { Ramp, Scheme } from './types.js';
+import type { Ramp, Scheme } from './types';
 
 /**
  * Colour derivation works in OKLCH, not HSL.

@@ -188,6 +188,13 @@ export default tseslint.config(
     },
   },
 
+  /* Metro and Babel load their config through CommonJS require, so these files cannot be ESM
+     however much the rest of the repo is. */
+  {
+    files: ['**/metro.config.js', '**/babel.config.js', '**/*.config.cjs'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+
   /* Build tooling logs to the terminal — that is its job. */
   {
     files: ['tools/**/*.ts'],
