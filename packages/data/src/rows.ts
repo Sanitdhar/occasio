@@ -212,11 +212,16 @@ export type TenantRow = {
  *
  * `published_config` is null until the first publish; that null is what "never been live" means,
  * and it is the state the site-review queue (D25) reads.
+ *
+ * **There is deliberately no row-level `version` column.** Each document carries its own
+ * `version` (§2), and the two are genuinely independent: migrating a tenant's draft to a new
+ * config schema while its published site stays on the old one is the normal shape of a rollout,
+ * and a single column on the row cannot express it. A column duplicating
+ * `draft_config->>'version'` could only agree with it by convention, and would be the thing that
+ * disagrees. Finding un-migrated rows is an index on the jsonb path, not a second copy.
  */
 export type TenantConfigRow = {
   readonly tenant_id: TenantId;
-  /** Document schema version, for `migrateTenantConfig()`. Distinct from the row's own shape. */
-  readonly version: number;
   readonly draft_config: TenantConfig;
   readonly published_config: TenantConfig | null;
   readonly published_at: Timestamptz | null;
@@ -398,6 +403,39 @@ export type MediaAssetRow = {
   readonly status: ModerationStatus;
   readonly created_at: Timestamptz;
   readonly updated_at: Timestamptz;
+};
+
+/**
+ * `personas` — the mask a poster wears (ADR-0006). `gossip_posts.persona_id` resolves here, and
+ * without the table that column points at nothing: the board has to render "Golden Peacock" and
+ * an avatar, and neither is derivable from a uuid.
+ *
+ * A persona is a row rather than a pure function of the id because it accrues state. ADR-0006
+ * keeps the gamification seam open by letting points attach to something persistent that nobody,
+ * admin included, can map to a person — and a streak is not something an id derivation can hold.
+ *
+ * **Reset issues a new row, it does not edit this one.** "New mask" sets `retired_at` and inserts
+ * a fresh persona, so posts made under the old mask keep their old `persona_id` and stay grouped
+ * as they were. Mutating the label in place would silently rewrite the author of every past post.
+ *
+ * `device_hash` is the same salted value as `gossip_posts.author_device_hash` and carries the same
+ * absolute rule: **it is never exposed, to anyone.** It is here because assignment and reset need
+ * to find the mask a device is currently wearing, and a device that has not posted yet has no row
+ * in `gossip_posts` to find it from. `rows.test.ts` pins the set of tables allowed to hold it.
+ *
+ * The repository contract for lookup and reset is #33 and #55, not this file.
+ */
+export type PersonaRow = {
+  readonly id: PersonaId;
+  readonly tenant_id: TenantId;
+  /** The generated name shown on every post — "Golden Peacock". */
+  readonly label: string;
+  /** Seed for the generated avatar, so the mask renders identically on every device. */
+  readonly avatar_key: string;
+  readonly device_hash: string;
+  /** Set by "new mask". Non-null means this persona is history, and its posts stay as they are. */
+  readonly retired_at: Timestamptz | null;
+  readonly created_at: Timestamptz;
 };
 
 /**

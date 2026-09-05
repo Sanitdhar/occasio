@@ -9,6 +9,7 @@ import type {
   NotificationDelivery,
   NotificationPreferences,
   Person,
+  Persona,
   Rsvp,
   Session,
   SessionPerson,
@@ -30,6 +31,7 @@ import type {
   NotificationDeliveryRow,
   NotificationPreferenceRow,
   PersonRow,
+  PersonaRow,
   RsvpRow,
   SessionPersonRow,
   SessionRow,
@@ -85,7 +87,6 @@ export const toTenant = (row: TenantRow): Tenant => ({
  */
 export const toTenantConfigRecord = (row: TenantConfigRow): TenantConfigRecord => ({
   tenantId: row.tenant_id,
-  version: row.version,
   draft: row.draft_config,
   published:
     row.published_config !== null && row.published_at !== null
@@ -191,6 +192,20 @@ export const toMediaAsset = (row: MediaAssetRow): MediaAsset => ({
   byteSize: row.byte_size,
   uploadedBy: row.uploaded_by,
   status: row.status,
+  createdAt: row.created_at,
+});
+
+/**
+ * **Drops `device_hash`, exactly as `toGossipPost` does.** The persona is the half of ADR-0006's
+ * identity model that is meant to be seen; the hash is the half that never is, and the mapper is
+ * where that split is made real rather than promised.
+ */
+export const toPersona = (row: PersonaRow): Persona => ({
+  id: row.id,
+  tenantId: row.tenant_id,
+  label: row.label,
+  avatarKey: row.avatar_key,
+  retiredAt: row.retired_at,
   createdAt: row.created_at,
 });
 

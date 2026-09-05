@@ -24,6 +24,7 @@ import {
   toMembership,
   toNotificationPreferences,
   toPerson,
+  toPersona,
   toRsvp,
   toSession,
   toSessionPerson,
@@ -42,6 +43,7 @@ import type {
   MembershipRow,
   NotificationPreferenceRow,
   PersonRow,
+  PersonaRow,
   RsvpRow,
   SessionPersonRow,
   SessionRow,
@@ -122,7 +124,6 @@ describe('toTenantConfigRecord', () => {
 
   const row: TenantConfigRow = {
     tenant_id: T,
-    version: 1,
     draft_config: draft,
     published_config: published,
     published_at: '2025-12-01T08:00:00Z',
@@ -134,7 +135,6 @@ describe('toTenantConfigRecord', () => {
   it('collapses the published triple into one object', () => {
     expect(toTenantConfigRecord(row)).toEqual({
       tenantId: T,
-      version: 1,
       draft,
       published: { config: published, at: '2025-12-01T08:00:00Z', by: ADMIN },
       createdAt: '2025-11-01T09:00:00Z',
@@ -152,9 +152,11 @@ describe('toTenantConfigRecord', () => {
     expect(toTenantConfigRecord(neverPublished).published).toBeNull();
   });
 
-  it('refuses a half-written publish rather than putting it live', () => {
-    const noTimestamp: TenantConfigRow = { ...row, published_at: null };
-    expect(toTenantConfigRecord(noTimestamp).published).toBeNull();
+  it.each([
+    ['no timestamp', { published_at: null }],
+    ['no document', { published_config: null }],
+  ])('refuses a half-written publish (%s) rather than putting it live', (_label, patch) => {
+    expect(toTenantConfigRecord({ ...row, ...patch }).published).toBeNull();
   });
 
   it('still publishes when nobody is recorded as the publisher', () => {
@@ -394,8 +396,47 @@ describe('toMediaAsset', () => {
     });
   });
 
-  it('has no dimensions when only one side is known, so no aspect ratio is invented', () => {
-    expect(toMediaAsset({ ...row, height: null }).dimensions).toBeNull();
+  it.each([
+    ['width', { width: null }],
+    ['height', { height: null }],
+    ['both', { width: null, height: null }],
+  ])('has no dimensions without %s, so no aspect ratio is invented', (_label, patch) => {
+    expect(toMediaAsset({ ...row, ...patch }).dimensions).toBeNull();
+  });
+});
+
+describe('toPersona', () => {
+  const row: PersonaRow = {
+    id: personaId('persona_golden_peacock'),
+    tenant_id: T,
+    label: 'Golden Peacock',
+    avatar_key: 'peacock-04',
+    device_hash: 'sha256:5f2b\u2026never-leaves-the-row',
+    retired_at: null,
+    created_at: '2026-02-14T11:00:00Z',
+  };
+
+  it('maps the public half of the identity model', () => {
+    expect(toPersona(row)).toEqual({
+      id: personaId('persona_golden_peacock'),
+      tenantId: T,
+      label: 'Golden Peacock',
+      avatarKey: 'peacock-04',
+      retiredAt: null,
+      createdAt: '2026-02-14T11:00:00Z',
+    });
+  });
+
+  it('never lets the device hash out, under any key', () => {
+    const persona = toPersona(row);
+    expect(Object.values(persona)).not.toContain(row.device_hash);
+    expect(JSON.stringify(persona)).not.toContain('never-leaves-the-row');
+  });
+
+  it('marks a retired mask, since reset issues a new row rather than editing this one', () => {
+    const retired = toPersona({ ...row, retired_at: '2026-02-15T09:00:00Z' });
+    expect(retired.retiredAt).toBe('2026-02-15T09:00:00Z');
+    expect(retired.id).toBe(row.id);
   });
 });
 
@@ -624,7 +665,11 @@ describe('toNotificationPreferences', () => {
     });
   });
 
-  it('has no window when one end is missing, since it could not be evaluated', () => {
-    expect(toNotificationPreferences({ ...row, quiet_hours_end: null }).quietHours).toBeNull();
+  it.each([
+    ['start', { quiet_hours_start: null }],
+    ['end', { quiet_hours_end: null }],
+    ['both', { quiet_hours_start: null, quiet_hours_end: null }],
+  ])('has no window without the %s, since it could not be evaluated', (_label, patch) => {
+    expect(toNotificationPreferences({ ...row, ...patch }).quietHours).toBeNull();
   });
 });

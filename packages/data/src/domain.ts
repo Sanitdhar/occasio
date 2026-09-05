@@ -85,7 +85,6 @@ export type Tenant = {
  */
 export type TenantConfigRecord = {
   readonly tenantId: TenantId;
-  readonly version: number;
   readonly draft: TenantConfig;
   readonly published: {
     readonly config: TenantConfig;
@@ -200,6 +199,22 @@ export type MediaAsset = {
   readonly byteSize: number | null;
   readonly uploadedBy: UserId | null;
   readonly status: ModerationStatus;
+  readonly createdAt: Timestamptz;
+};
+
+/**
+ * The mask on a post — what the board actually renders next to the body.
+ *
+ * Like `GossipPost`, this drops `device_hash`. The persona is the *public* half of ADR-0006's
+ * identity model and the hash is the private half; a type that carried both would defeat the
+ * split the two columns exist to make.
+ */
+export type Persona = {
+  readonly id: PersonaId;
+  readonly tenantId: TenantId;
+  readonly label: string;
+  readonly avatarKey: string;
+  readonly retiredAt: Timestamptz | null;
   readonly createdAt: Timestamptz;
 };
 

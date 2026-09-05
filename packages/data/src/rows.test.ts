@@ -134,11 +134,18 @@ describe('row types', () => {
     expect(row?.members.map((m) => m.name)).toContain(column);
   });
 
-  it('keeps the device hash on the gossip table and nowhere else', () => {
+  /**
+   * The salted device hash is the one value in the schema that would deanonymise a poster, so
+   * the set of tables allowed to hold it is pinned rather than left to reviewer attention.
+   * `gossip_posts` needs it to rate-limit and block; `personas` needs it because assignment and
+   * reset have to find the mask a device wears, and a device that has not posted yet has no
+   * gossip row to find it from. A third table appearing here is a decision, not a detail.
+   */
+  it('keeps the device hash to the two tables that need it', () => {
     const carriers = rows
       .filter((row) => row.members.some((m) => m.name.includes('device_hash')))
       .map((row) => row.name);
-    expect(carriers).toEqual(['GossipPostRow']);
+    expect([...carriers].sort()).toEqual(['GossipPostRow', 'PersonaRow']);
   });
 
   it('never stores a user id against a gossip post (D15 — anonymity is a schema property)', () => {
