@@ -82,4 +82,10 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - run: npm run build:web --if-present
+      # No --if-present: the script exists now, and a gate that silently skips is worse
+      # than no gate. If the export breaks, this job must fail.
+      - run: npm run build:web
+      - name: Fail if the export produced nothing
+        run: |
+          test -f apps/mobile/dist/index.html
+          test -n "$(find apps/mobile/dist/_expo -name '*.js' -print -quit)"

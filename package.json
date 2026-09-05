@@ -14,16 +14,17 @@
     "tools/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "build:web": "npm run export:web --workspace @occasio/mobile",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "preview:theme": "tsx tools/theme-preview/generate.ts",
     "test": "jest",
     "test:contracts": "jest --selectProjects contracts",
+    "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run verify:enforcement && npm test",
-    "verify:enforcement": "node tools/enforcement/verify-enforcement.mjs",
-    "preview:theme": "tsx tools/theme-preview/generate.ts"
+    "verify:enforcement": "node tools/enforcement/verify-enforcement.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",
