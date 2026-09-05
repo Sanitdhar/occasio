@@ -26,6 +26,13 @@ behaviour of the app.** There is no per-event code. A new event is a new row.
 One TypeScript codebase renders iOS, Android and web from a single Expo tree. Web ships first —
 free to host, no store review, and a link that works the moment you send it.
 
+## Reviewing
+
+Every PR is reviewed by [CodeRabbit](https://coderabbit.ai), configured in
+[`.coderabbit.yaml`](.coderabbit.yaml) with this project's frozen decisions so its feedback is
+specific rather than generic. The mechanical rules are enforced by lint and CI; CodeRabbit is
+there for the judgement calls.
+
 ## Requirements
 
 - Node 22 (`.nvmrc` pins it; `nvm use` picks it up)

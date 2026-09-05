@@ -60,12 +60,13 @@ Decisions with enough consequence to need their own reasoning have an [ADR](adr/
 
 ## Process
 
-| #   | Decision                                                                                                                                      |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| D34 | **Trunk-based branching.** Short-lived branches off `main`, squash-merged and deleted. `main` is always releasable                            |
-| D35 | **One PR per issue** — issues are scoped to be reviewable in one sitting. A PR that outgrows its issue gets split, not explained              |
-| D36 | **A milestone completing is the release trigger**: tag `v0.x.0`, notes generated from merged PRs. `v1.0.0` means a real event has run on this |
-| D37 | **Six milestones**, each ending in something you can open in a browser and show someone                                                       |
+| #   | Decision                                                                                                                                                                                                                                                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D38 | **CodeRabbit** reviews every PR, and the repo is **public** — which makes CodeRabbit free forever and GitHub Actions minutes unlimited. `.coderabbit.yaml` teaches it the frozen decisions so it reviews for this codebase rather than giving generic advice |
+| D34 | **Trunk-based branching.** Short-lived branches off `main`, squash-merged and deleted. `main` is always releasable                                                                                                                                           |
+| D35 | **One PR per issue** — issues are scoped to be reviewable in one sitting. A PR that outgrows its issue gets split, not explained                                                                                                                             |
+| D36 | **A milestone completing is the release trigger**: tag `v0.x.0`, notes generated from merged PRs. `v1.0.0` means a real event has run on this                                                                                                                |
+| D37 | **Six milestones**, each ending in something you can open in a browser and show someone                                                                                                                                                                      |
 
 See [workflow.md](workflow.md) for how this works day to day, and the
 [roadmap board](https://github.com/users/Sanitdhar/projects/1) for the issues themselves.

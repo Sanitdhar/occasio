@@ -41,6 +41,22 @@ A PR must:
 - carry a title in conventional-commit form — it becomes the squashed commit message, and the
   release notes are generated from those
 
+## Review
+
+CodeRabbit reviews every PR against `main` automatically (D38). It is configured in
+[`.coderabbit.yaml`](../.coderabbit.yaml) with the frozen decisions as path instructions, so it
+knows that literal colours are forbidden, that the theme resolver must stay pure, that
+`tenantId` is always the first argument, and that a new architectural rule needs a probe proving
+it fires.
+
+It does not block merges — `request_changes_workflow` is off, because a solo maintainer blocking
+their own PRs achieves nothing. Treat it as the reviewer you would otherwise not have, not as a
+gate. `@coderabbitai` in a comment will answer questions or re-review.
+
+The division of labour is deliberate: the four CI gates catch mechanical failures, and
+CodeRabbit is there for the judgement-level review — the design call that will hurt in three
+months, the case nobody thought to test.
+
 ## The four gates
 
 | Gate        | What it protects                                       |

@@ -1,0 +1,134 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+#
+# The mechanical rules are already enforced by lint, the contract suite and the enforcement
+# probes (see docs/decisions.md). CodeRabbit is here for the judgement-level review that a solo
+# maintainer otherwise never gets — so the instructions below tell it what this codebase's
+# frozen decisions are, rather than letting it give generic advice that contradicts them.
+
+language: en-GB
+
+tone_instructions: >-
+  Direct and specific. Say what breaks and under what input. Skip praise and preamble. If a
+  frozen decision in docs/decisions.md already settles a question, cite it rather than
+  reopening it.
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: true
+  changed_files_summary: true
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_issues: true
+  poem: false
+  in_progress_fortune: false
+  sequence_diagrams: false
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - main
+
+  path_filters:
+    - '!package-lock.json'
+    - '!.artifacts/**'
+    - '!**/__screenshots__/**'
+
+  path_instructions:
+    - path: packages/theme/src/{resolve,color}.ts
+      instructions: >-
+        This is the purity boundary. Flag any import of react, react-native or @occasio/data.
+        resolveTheme must stay pure, synchronous and deterministic — same input, same tokens,
+        same id — because live preview, the cache key and the contrast property test all depend
+        on it. Contrast is ENFORCED here, never merely checked: a new colour role must pass
+        through ensureContrast or onColorFor with an explicit target. Status colours must never
+        be derived from the brand seed.
+
+    - path: packages/theme/**
+      instructions: >-
+        A new token added to ResolvedTheme needs a corresponding requirement in
+        contrast.test.ts if anything is ever rendered on it. Colour maths belongs in OKLCH, not
+        HSL. Watch for achromatic seeds: chroma below the threshold must stay achromatic rather
+        than acquiring an invented hue.
+
+    - path: packages/ui/**
+      instructions: >-
+        Components must read colour, spacing, radius and type only from the resolved theme —
+        literal values are a lint error, but also flag values smuggled through variables or
+        computed strings. No expo-router imports: screens stay pure so the theme editor can
+        render them under a nested provider. Use expo-image with a blurhash, never bare Image.
+        Any per-theme cache must be bounded — a colour-picker drag produces hundreds of themes.
+        Pressable needs hover, pressed, focus and disabled states or the web build feels dead.
+
+    - path: packages/data/**
+      instructions: >-
+        Row types are snake_case and must match the eventual Postgres tables exactly; domain
+        objects are camelCase; mappers.ts is the only meeting point and the only place a cast
+        is allowed. Every repository method takes tenantId as its first argument even when it
+        could be inferred — that mirrors row-level security and prevents cross-tenant leaks.
+        Methods stay async, cursor-paginated and error-typed even where the mock ignores it.
+        @supabase/* may only appear under packages/data/src/supabase/**. Flag any new entity
+        missing the fields that cannot be retrofitted: author_device_hash on gossip posts,
+        draft/published theme config, blurhash and dominant_color on media, tenant timezone.
+
+    - path: apps/*/app/**
+      instructions: >-
+        Route files are thin adapters: read params, compose providers, render a screen. Any
+        business logic or data shaping here belongs in features/. Nothing under app/ should be
+        needed to render a screen in the theme editor's preview.
+
+    - path: apps/*/src/features/**
+      instructions: >-
+        Screens are pure components — props in, JSX out, no router hooks, no fixture imports.
+        Model state as discriminated unions rather than several booleans that can contradict
+        each other. Every data call goes through the repository layer.
+
+    - path: tools/enforcement/**
+      instructions: >-
+        A new architectural rule must arrive with a probe here proving it fires. Two rules in
+        this repo were configured, looked correct, and did nothing until a probe caught them.
+        A probe that asserts nothing is worse than no probe.
+
+    - path: '**/*.test.ts'
+      instructions: >-
+        Check the test could actually fail. Flag assertions that hold regardless of the code
+        under test, property tests whose generator never reaches an interesting case, and
+        mocked-away subjects. Prefer a deterministic seed so a failure reproduces.
+
+    - path: .github/workflows/**
+      instructions: >-
+        A gate that passes without doing work is worse than no gate, because it reads as
+        protection. Flag steps guarded by --if-present against a script that does not exist,
+        and any container image that is not pinned — unpinned Playwright images make visual
+        baselines irreproducible.
+
+    - path: docs/decisions.md
+      instructions: >-
+        These decisions are frozen. A change here should be a deliberate reversal with reasoning
+        attached, not an incidental edit inside a feature PR.
+
+  tools:
+    eslint:
+      enabled: true
+    markdownlint:
+      enabled: false
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - docs/decisions.md
+      - docs/adr/**
+      - docs/workflow.md
+      - CONTRIBUTING.md
