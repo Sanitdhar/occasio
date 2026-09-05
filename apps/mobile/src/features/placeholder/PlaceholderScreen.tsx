@@ -19,7 +19,6 @@ type Props = {
  */
 export function PlaceholderScreen({ theme, eyebrow, title, description, arrivesIn }: Props) {
   const { color, type, space, radius, border } = theme;
-  console.error('probe: unhealthy route');
   return (
     <ScrollView
       style={{ backgroundColor: color.bg }}
