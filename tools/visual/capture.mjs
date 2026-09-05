@@ -47,12 +47,18 @@ const run = async () => {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
 
-  const server = await serve(DIST);
-  const browser = await chromium.launch();
   const failures = [];
   let shots = 0;
+  /* Declared before the try so cleanup can run even when setup is what failed: if
+     chromium.launch() rejects after the server is listening, an outer try that starts
+     below it never runs, the port stays open and no manifest is written. */
+  let server;
+  let browser;
 
   try {
+    server = await serve(DIST);
+    browser = await chromium.launch();
+
     for (const viewport of VIEWPORTS) {
       for (const scheme of SCHEMES) {
         const context = await browser.newContext({
@@ -107,8 +113,8 @@ const run = async () => {
       }
     }
   } finally {
-    await browser.close();
-    await server.close();
+    await browser?.close();
+    await server?.close();
     writeFileSync(
       join(OUT, 'manifest.json'),
       JSON.stringify(
