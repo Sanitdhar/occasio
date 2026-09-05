@@ -1,0 +1,31 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Expo
+.expo/
+.expo-shared/
+web-build/
+ios/
+android/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Playwright / visual regression
+test-results/
+playwright-report/
+blob-report/
+**/__screenshots__/**/*.actual.png
+**/__screenshots__/**/*.diff.png
+
+# Editors & OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json

@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # D19 gate 1 — types, boundaries, hardcoded colours, logic.
+  verify:
+    name: Typecheck, lint & unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - name: Prove the architectural rules actually fire
+        run: npm run verify:enforcement
+      - run: npm test -- --selectProjects unit
+
+  # D19 gate 2 — the mock -> Supabase swap guarantee.
+  contracts:
+    name: Adapter contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run test:contracts
+
+  # D19 gate 3 — theme regressions unit tests structurally cannot catch.
+  #
+  # Runs in a PINNED Playwright container, never on a bare runner: font rendering differs
+  # between environments, and unpinned baselines produce phantom diffs on every PR.
+  visual:
+    name: Visual regression across tenants
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Screenshot every fixture tenant in light and dark
+        run: npm run test:visual --if-present
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: visual-diffs
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+
+  # D19 gate 4 — Metro and platform-split mistakes (a .native.ts reaching web).
+  web-build:
+    name: Web export build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build:web --if-present

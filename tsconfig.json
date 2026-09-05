@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@occasio/core": ["packages/core/src/index.ts"],
+      "@occasio/core/*": ["packages/core/src/*"],
+      "@occasio/theme": ["packages/theme/src/index.ts"],
+      "@occasio/theme/*": ["packages/theme/src/*"],
+      "@occasio/data": ["packages/data/src/index.ts"],
+      "@occasio/data/*": ["packages/data/src/*"],
+      "@occasio/ui": ["packages/ui/src/index.ts"],
+      "@occasio/ui/*": ["packages/ui/src/*"]
+    }
+  },
+  "include": ["packages/*/src/**/*", "apps/*/src/**/*", "apps/*/app/**/*"]
+}
