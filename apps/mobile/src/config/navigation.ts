@@ -46,6 +46,15 @@ export const FIXTURE_NAV: NavConfig = {
 export const visibleTabs = (nav: NavConfig): readonly FeatureKey[] =>
   [...new Set(nav.tabs)].filter((key) => nav.features[key]);
 
+/**
+ * Routes that live inside the tabs group but are not tabs.
+ *
+ * expo-router turns every route it discovers in a Tabs layout into a tab, so a detail screen
+ * nested under a tab's folder shows up as a stray sixth tab unless it is explicitly hidden.
+ * Found by screenshotting the running app — nothing in the type system or the tests catches it.
+ */
+export const NON_TAB_ROUTES = ['schedule/[sessionId]'] as const;
+
 export type TabPlan = {
   readonly key: FeatureKey;
   readonly name: string;

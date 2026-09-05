@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { FIXTURE_NAV, planTabs } from '../../../../src/config/navigation';
+import { FIXTURE_NAV, NON_TAB_ROUTES, planTabs } from '../../../../src/config/navigation';
 import { useScaffoldTheme } from '../../../../src/theme/useScaffoldTheme';
 
 /**
@@ -18,6 +18,9 @@ export default function AttendeeTabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        /* No icon set yet — without this react-navigation renders a default placeholder glyph,
+           which looks like a rendering fault. Labels only until the design system lands. */
+        tabBarIcon: () => null,
         tabBarActiveTintColor: theme.color.brand,
         tabBarInactiveTintColor: theme.color.textFaint,
         tabBarStyle: {
@@ -32,6 +35,9 @@ export default function AttendeeTabsLayout() {
           name={tab.name}
           options={tab.hidden ? { title: tab.title, href: null } : { title: tab.title }}
         />
+      ))}
+      {NON_TAB_ROUTES.map((name) => (
+        <Tabs.Screen key={name} name={name} options={{ href: null }} />
       ))}
     </Tabs>
   );
