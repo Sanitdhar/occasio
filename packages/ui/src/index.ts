@@ -69,6 +69,7 @@ export { initialsFrom } from './primitives/initials';
 export {
   SPACE_STEPS,
   surfaceBackground,
+  surfacePalette,
   tonalPalette,
   type BorderTone,
   type RadiusScale,

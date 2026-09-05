@@ -89,6 +89,21 @@ export const tonalPalette = (theme: ResolvedTheme, tone: TonalTone): TonalPalett
   }
 };
 
+/**
+ * The palette a Surface uses. Its content colour is body text, because that is what will sit on
+ * the box and therefore the pair a hover fill has to keep readable — the component does not get
+ * to guess at that, and stating it here is what lets the sweep in tones.test.ts check it.
+ */
+export const surfacePalette = (
+  theme: ResolvedTheme,
+  tone: SurfaceTone,
+  border: BorderTone,
+): TonalPalette => ({
+  background: surfaceBackground(theme, tone),
+  border: border === 'strong' ? theme.color.borderStrong : theme.color.border,
+  content: theme.color.text,
+});
+
 export const TONAL_TONES: readonly TonalTone[] = [
   'neutral',
   'brand',
@@ -100,3 +115,5 @@ export const TONAL_TONES: readonly TonalTone[] = [
 ];
 
 export const SURFACE_TONES: readonly SurfaceTone[] = ['sunken', 'base', 'raised'];
+
+export const BORDER_TONES: readonly BorderTone[] = ['none', 'hairline', 'strong'];

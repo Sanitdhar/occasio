@@ -5,12 +5,11 @@ import { useTheme } from '../theme/useTheme';
 import { InteractiveBox } from './InteractiveBox';
 import {
   SPACE_STEPS,
-  surfaceBackground,
+  surfacePalette,
   type BorderTone,
   type RadiusScale,
   type SpaceScale,
   type SurfaceTone,
-  type TonalPalette,
 } from './tones';
 
 /**
@@ -119,17 +118,10 @@ export function Surface({
   const theme = useTheme();
   const styles = useSurfaceStyles();
 
-  const palette: TonalPalette = {
-    background: surfaceBackground(theme, tone),
-    border: border === 'strong' ? theme.color.borderStrong : theme.color.border,
-    /* Body text is what will sit on this box, so it is the pair the hover fill must protect. */
-    content: theme.color.text,
-  };
-
   return (
     <InteractiveBox
       {...rest}
-      palette={palette}
+      palette={surfacePalette(theme, tone, border)}
       boxStyle={[
         styles.box,
         styles[BORDER_STYLE[border]],

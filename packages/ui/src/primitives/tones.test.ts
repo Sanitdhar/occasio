@@ -2,7 +2,15 @@ import { PRESET_IDS, contrast, resolveTheme, themeInputFromPreset } from '@occas
 import type { ResolvedTheme, Scheme } from '@occasio/theme';
 import { describe, expect, it } from '@jest/globals';
 import { interactiveFill, type PressState } from './interaction';
-import { SPACE_STEPS, SURFACE_TONES, TONAL_TONES, surfaceBackground, tonalPalette } from './tones';
+import {
+  BORDER_TONES,
+  SPACE_STEPS,
+  SURFACE_TONES,
+  TONAL_TONES,
+  surfaceBackground,
+  surfacePalette,
+  tonalPalette,
+} from './tones';
 
 /**
  * The primitives promise two things the theme package cannot check on its own: that every
@@ -117,6 +125,31 @@ describe('surface tones', () => {
         const ratio = contrast(theme.color.text, surfaceBackground(theme, tone));
         return ratio >= AAA_TEXT ? [] : [`text on ${tone} is ${ratio.toFixed(2)}`];
       }),
+    );
+
+    expect(failures).toEqual([]);
+  });
+
+  it('keep body text at AAA on a pressable card, hovered and pressed', () => {
+    /* A pressable Card tints its own fill, so the AAA promise has to survive the tint — this is
+       the pair a card actually renders, which the tonal-palette sweep below does not cover. */
+    const failures = sweep((theme) =>
+      SURFACE_TONES.flatMap((tone) =>
+        BORDER_TONES.flatMap((border) => {
+          const palette = surfacePalette(theme, tone, border);
+          const states = [
+            ['hovered', state({ hovered: true })],
+            ['pressed', state({ pressed: true })],
+          ] as const;
+
+          return states.flatMap(([name, pressState]) => {
+            const ratio = contrast(palette.content, interactiveFill(theme, palette, pressState));
+            return ratio >= AAA_TEXT
+              ? []
+              : [`text on ${tone}/${border} when ${name} is ${ratio.toFixed(2)}`];
+          });
+        }),
+      ),
     );
 
     expect(failures).toEqual([]);
