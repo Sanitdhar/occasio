@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, describe, expect, it, jest } from '@jest/globals';
 import { tenantId, userId, type UserId } from '@occasio/core';
 import { FIXTURE_SEED } from '../fixtures/index';
 import type { GossipChange } from '../repositories';
@@ -37,6 +37,14 @@ const adapterFor = (as: UserId): MockAdapter =>
 const ALL = ['pending', 'approved', 'rejected', 'hidden'] as const;
 
 describe('gossip subscriptions', () => {
+  /* One case below deliberately throws inside a listener, and the adapter reports that on
+     `console.warn`. Silenced so the expected noise does not read as a failing run. */
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+  afterAll(() => {
+    warn.mockRestore();
+  });
+
   it('delivers a post the moment it is created', async () => {
     const adapter = adapterFor(MODERATOR);
     const seen: GossipChange[] = [];
@@ -223,6 +231,35 @@ describe('gossip subscriptions', () => {
 
     expect(wedding).toHaveLength(1);
     expect(festival).toHaveLength(1);
+  });
+
+  it('does not let a broken subscriber break the write', async () => {
+    /*
+     * The write is already persisted when listeners run, so an exception escaping would reject
+     * `create` for a post that exists -- and a caller retrying a rejected create writes it
+     * twice. One screen's rendering bug would become duplicated data, blamed on the adapter.
+     */
+    const adapter = adapterFor(MODERATOR);
+    const reached: string[] = [];
+
+    const stopBroken = await adapter.gossip.subscribe(WEDDING, { statuses: ALL }, () => {
+      throw new Error('this subscriber is broken');
+    });
+    const stopWorking = await adapter.gossip.subscribe(WEDDING, { statuses: ALL }, () => {
+      reached.push('delivered');
+    });
+
+    await expect(
+      adapter.gossip.create(WEDDING, { body: 'Written regardless', mediaId: null }),
+    ).resolves.toBeDefined();
+    stopBroken();
+    stopWorking();
+
+    /* And the one after it still heard: a single broken subscriber must not freeze everyone
+       else's board. */
+    expect(reached).toEqual(['delivered']);
+    const stored = await adapter.gossip.list(WEDDING, { statuses: ['pending'] }, { limit: 50 });
+    expect(stored.items.filter((p) => p.body === 'Written regardless')).toHaveLength(1);
   });
 
   it('filters by the statuses the listener asked for', async () => {

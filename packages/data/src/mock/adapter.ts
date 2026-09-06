@@ -1058,13 +1058,33 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
       const isVisible = subscription.statuses.includes(item.status);
       if (!wasVisible && !isVisible) continue;
 
-      subscription.listener(
-        isVisible
-          ? { kind: previousStatus === null ? 'created' : 'updated', item }
-          : /* Left this subscriber's view. `deleted` is the vocabulary a list has for "drop
-               this row"; the post still exists, it is simply no longer theirs to show. */
-            { kind: 'deleted', id: item.id },
-      );
+      /*
+       * A listener that throws must not reach the caller.
+       *
+       * The write has already been persisted by this point, so letting the exception escape
+       * rejects `create` for a post that exists -- and a caller who retries a rejected create
+       * writes it twice. One screen's rendering bug would become duplicated data, which is a
+       * far worse outcome than the bug itself, and it would be blamed on the adapter.
+       *
+       * It also stops delivery to every listener after this one, so a single broken subscriber
+       * silently freezes everybody else's board.
+       */
+      try {
+        subscription.listener(
+          isVisible
+            ? { kind: previousStatus === null ? 'created' : 'updated', item }
+            : /* Left this subscriber's view. `deleted` is the vocabulary a list has for "drop
+                 this row"; the post still exists, it is simply no longer theirs to show. */
+              { kind: 'deleted', id: item.id },
+        );
+      } catch (error) {
+        /* Reported rather than swallowed. There is no observer seam in the adapter yet (#32
+           will bring one), and a silent catch here would hide the very bug this is protecting
+           the write from. Metro strips the branch from a production build. */
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('<mock adapter>: a gossip subscriber threw; delivery continues.', error);
+        }
+      }
     }
   };
 
