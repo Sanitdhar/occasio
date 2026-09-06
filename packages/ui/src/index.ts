@@ -94,3 +94,11 @@ export {
   type Breakpoint,
   type BreakpointName,
 } from './layout/breakpoints';
+
+/* Inputs (#29). The composer, the theme editor and the preferences screens all need these
+   three; `fieldState` is exported because the decision it makes -- an error replaces the hint
+   rather than joining it -- is the same one a form-level summary has to make. */
+export { Field, type FieldProps } from './inputs/Field';
+export { Segmented, type SegmentedOption } from './inputs/Segmented';
+export { Sheet } from './inputs/Sheet';
+export { fieldAria, fieldMessage, type FieldMessage } from './inputs/fieldState';
