@@ -165,13 +165,20 @@ const effectiveDiff = async (sha) => {
     const comparison = await apiOne(
       `/repos/${REPO}/compare/${prData.base.ref}...${sha}?per_page=300`,
     );
-    const files = comparison.files ?? [];
     /*
-     * The endpoint stops at 300 files. At the cap the list is truncated, so two different large
-     * pull requests can fingerprint identically while an unlisted file differs — and this
-     * function's answer is used to skip a review. Unknown, not equal.
+     * Everything below fails closed, because this function's answer is used to skip a review and
+     * every uncertainty here is shaped the same way: two incomplete comparisons produce equal
+     * fingerprints, and equal reads as "already reviewed".
      */
+    const files = comparison.files;
+    /* An absent list fingerprints as the empty string, and so does another absent list. */
+    if (!Array.isArray(files)) return null;
+    /* The endpoint stops at 300 files; at the cap the list is truncated, so a file nobody
+       listed can differ while the two fingerprints match. */
     if (files.length >= COMPARE_FILE_CAP) return null;
+    /* A file with neither a patch nor a blob sha is a file this cannot describe. Both would
+       serialise as `binary:unknown`, which is one unknown matching another. */
+    if (files.some((f) => f.patch === undefined && f.sha === undefined)) return null;
     return diffFingerprint(files);
   } catch {
     /* A force-pushed commit can fall out of reach. Unknown is not "unchanged". */

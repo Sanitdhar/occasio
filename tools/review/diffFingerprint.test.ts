@@ -55,11 +55,11 @@ describe('diffFingerprint', () => {
     expect(diffFingerprint([one])).not.toBe(diffFingerprint([two]));
   });
 
-  it('does not treat a missing sha as equal to another missing sha', () => {
-    /* Two unknowns are not a match. They fingerprint identically here, which is why
-       check-reviewed treats an unreachable comparison as "different" before it gets this far —
-       asserted so that the weakness stays visible rather than being discovered later. */
-    const unknown = { filename: 'assets/hero.png', status: 'modified' };
+  it('marks a file it cannot describe, so the caller can refuse it', () => {
+    /* Two unknowns are not a match, but they fingerprint identically here — this function sees
+       only the list it is handed. `check-reviewed` refuses such a file before calling in, and
+       the marker is asserted so the two halves of that arrangement cannot drift apart. */
+    const unknown: ComparedFile = { filename: 'assets/hero.png', status: 'modified' };
     expect(diffFingerprint([unknown])).toContain('binary:unknown');
   });
 
