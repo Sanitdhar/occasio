@@ -6,7 +6,7 @@
     "version": "0.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "plugins": ["expo-router", "expo-font"],
+    "plugins": ["expo-router", "expo-font", "expo-image"],
     "web": {
       "bundler": "metro",
       "output": "single"
