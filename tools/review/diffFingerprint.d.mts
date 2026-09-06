@@ -10,9 +10,12 @@
 /** One entry of GitHub's compare response, narrowed to the fields the fingerprint reads. */
 export type ComparedFile = {
   readonly filename?: string | undefined;
+  /** Set by GitHub only for a rename; the path the file came from. */
+  readonly previous_filename?: string | undefined;
   readonly status?: string | undefined;
   readonly patch?: string | undefined;
   readonly sha?: string | undefined;
 };
 
+export declare const COMPARE_FILE_CAP: number;
 export declare const diffFingerprint: (files: readonly ComparedFile[]) => string;

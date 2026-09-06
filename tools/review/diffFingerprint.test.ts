@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { diffFingerprint, type ComparedFile } from './diffFingerprint.mjs';
+import { COMPARE_FILE_CAP, diffFingerprint, type ComparedFile } from './diffFingerprint.mjs';
 
 /**
  * The rule this encodes: a rebase is not a change, and everything else is.
@@ -61,6 +61,38 @@ describe('diffFingerprint', () => {
        asserted so that the weakness stays visible rather than being discovered later. */
     const unknown = { filename: 'assets/hero.png', status: 'modified' };
     expect(diffFingerprint([unknown])).toContain('binary:unknown');
+  });
+
+  it('separates two renames that land on the same path with the same contents', () => {
+    /* Same destination, same patch, same status -- the source path is the only difference, and
+       without it moving `secrets.ts` to `config.ts` fingerprints identically to moving
+       `readme.ts` there. */
+    const fromSecrets = file({
+      filename: 'src/config.ts',
+      status: 'renamed',
+      previous_filename: 'src/secrets.ts',
+    });
+    const fromReadme = file({
+      filename: 'src/config.ts',
+      status: 'renamed',
+      previous_filename: 'src/readme.ts',
+    });
+
+    expect(diffFingerprint([fromSecrets])).not.toBe(diffFingerprint([fromReadme]));
+  });
+
+  it('separates a rename from an ordinary edit of the destination', () => {
+    expect(
+      diffFingerprint([
+        file({ filename: 'src/config.ts', status: 'renamed', previous_filename: 'src/old.ts' }),
+      ]),
+    ).not.toBe(diffFingerprint([file({ filename: 'src/config.ts', status: 'renamed' })]));
+  });
+
+  it('names the cap the caller has to fail closed on', () => {
+    /* The fingerprint itself cannot detect truncation -- it only sees the list it is handed --
+       so the cap lives here and check-reviewed refuses at it. Pinned so the two cannot drift. */
+    expect(COMPARE_FILE_CAP).toBe(300);
   });
 
   it('reports an empty comparison distinctly from a one-file one', () => {

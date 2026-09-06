@@ -16,7 +16,7 @@
  *   requests also work, at a lower rate limit.
  */
 import { readFileSync } from 'node:fs';
-import { diffFingerprint } from './diffFingerprint.mjs';
+import { COMPARE_FILE_CAP, diffFingerprint } from './diffFingerprint.mjs';
 
 /**
  * Exact logins, not a substring match.
@@ -165,7 +165,14 @@ const effectiveDiff = async (sha) => {
     const comparison = await apiOne(
       `/repos/${REPO}/compare/${prData.base.ref}...${sha}?per_page=300`,
     );
-    return diffFingerprint(comparison.files ?? []);
+    const files = comparison.files ?? [];
+    /*
+     * The endpoint stops at 300 files. At the cap the list is truncated, so two different large
+     * pull requests can fingerprint identically while an unlisted file differs — and this
+     * function's answer is used to skip a review. Unknown, not equal.
+     */
+    if (files.length >= COMPARE_FILE_CAP) return null;
+    return diffFingerprint(files);
   } catch {
     /* A force-pushed commit can fall out of reach. Unknown is not "unchanged". */
     return null;

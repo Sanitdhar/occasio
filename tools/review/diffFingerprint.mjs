@@ -12,13 +12,26 @@
  */
 
 /**
- * @param {{ filename?: string, patch?: string, sha?: string, status?: string }[]} files
+ * The most files GitHub's compare endpoint will report. A comparison at the cap is truncated,
+ * and a fingerprint built from a truncated list can match while an unlisted file differs — so
+ * the caller must treat it as unknown rather than as a comparison.
+ */
+export const COMPARE_FILE_CAP = 300;
+
+/**
+ * @param {{ filename?: string, previous_filename?: string, patch?: string, sha?: string, status?: string }[]} files
  * @returns {string}
  */
 export const diffFingerprint = (files) =>
   files
     .map((file) => {
       const name = file.filename ?? '';
+      /*
+       * Where a rename came from. Two renames landing on the same path with the same contents
+       * are the same patch and the same status, and differ only here — without it, moving
+       * `secrets.ts` to `config.ts` fingerprints identically to moving `readme.ts` to it.
+       */
+      const from = file.previous_filename ?? 'none';
       /*
        * A binary file has no patch, and its blob sha is the only thing that distinguishes one
        * version from another. Falling back to the empty string instead would make every binary
@@ -27,7 +40,7 @@ export const diffFingerprint = (files) =>
       const body = file.patch ?? `binary:${file.sha ?? 'unknown'}`;
       /* The status matters on its own: deleting a file and adding it back with the same
          contents is not the same change as leaving it alone. */
-      return `${name}\n${file.status ?? 'unknown'}\n${body}`;
+      return `${name}\n${from}\n${file.status ?? 'unknown'}\n${body}`;
     })
     /* Sorted, because the API does not promise a stable file order between calls, and a
        fingerprint that depends on response ordering would report spurious differences. */
