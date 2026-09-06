@@ -22,8 +22,12 @@ import { readFileSync } from 'node:fs';
  * Matching any login *containing* "coderabbit" would let anyone who registers such an account
  * post a comment saying "Walkthrough" and make this gate report a PR as reviewed — an
  * authorization bypass in the one check that exists to be trusted.
+ *
+ * Exactly one login, not two. The bare `coderabbitai` was here as a hedge, and a hedge is the
+ * bypass again with a smaller opening: the app posts as `coderabbitai[bot]`, which is what
+ * every comment and review on this repository actually carries.
  */
-const REVIEWER_LOGINS = new Set(['coderabbitai[bot]', 'coderabbitai']);
+const REVIEWER_LOGINS = new Set(['coderabbitai[bot]']);
 
 const REPO = process.env['GITHUB_REPOSITORY'] ?? 'dharlabs/occasio';
 const pr = process.argv[2];
