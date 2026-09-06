@@ -99,6 +99,18 @@ npm run check:reviewed -- <pr-number>
 It looks for evidence of an actual review — a walkthrough, a finding, or a submitted review —
 and exits non-zero if there is none.
 
+### When the budget is exhausted, Claude steps in (D42)
+
+CodeRabbit's "Review limit reached" comment triggers
+[`claude-fallback-review.yml`](../.github/workflows/claude-fallback-review.yml), which runs
+Claude Code against the PR in CodeRabbit's place. It is a fallback, not a second reviewer — it
+never runs on a PR CodeRabbit already reviewed, and `check:reviewed` accepts its findings as
+satisfying D40 the same way it accepts CodeRabbit's.
+
+Authenticated with a `CLAUDE_CODE_OAUTH_TOKEN` repository secret (generated via
+`claude setup-token`), and requires the official [Claude GitHub app](https://github.com/apps/claude)
+installed on the repo — without it, Claude has no permission to post comments back to the PR.
+
 ### Parallel work is capped by the review budget, not by machines
 
 CodeRabbit's capacity is a rolling, plan-dependent quota — not a number worth hardcoding here,
