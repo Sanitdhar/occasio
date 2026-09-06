@@ -35,8 +35,34 @@ describe('parseExcludedPaths', () => {
   });
 
   it('ignores an inclusion, which is not an exclusion', () => {
-    const config = "path_filters:\n  - '!excluded.json'\n  - 'included.json'\n";
+    const config = "reviews:\n  path_filters:\n    - '!excluded.json'\n    - 'included.json'\n";
     expect(parseExcludedPaths(config)).toEqual(['excluded.json']);
+  });
+
+  it('reads a block that ends at end of input', () => {
+    /* The case the first parser could not do: it terminated the block with `\\Z`, a Python
+       idiom that in JavaScript matches a literal "Z", so a `path_filters:` block with nothing
+       after it parsed as nothing at all. It only worked against the real config because
+       `path_instructions:` happens to follow — and the previous version of this test asserted
+       the *absent* block, which passes either way. */
+    expect(parseExcludedPaths("reviews:\n  path_filters:\n    - '!package-lock.json'\n")).toEqual([
+      'package-lock.json',
+    ]);
+  });
+
+  it('reads a block written with comments in it', () => {
+    /* All three forms, because a comment anywhere in the block used to make the whole list come
+       back empty — and an empty exclusion list stops excluding, which fails open. */
+    const commented = [
+      'reviews:',
+      '  path_filters: # paths the reviewer never reads',
+      '    # the lockfile is regenerated, not written',
+      "    - '!package-lock.json'",
+      "    - '!.artifacts/**' # scratch space",
+      '',
+    ].join('\n');
+
+    expect(parseExcludedPaths(commented)).toEqual(['package-lock.json', '.artifacts/**']);
   });
 
   it('returns nothing when there is no such block', () => {
@@ -44,6 +70,8 @@ describe('parseExcludedPaths', () => {
        more review rather than less. */
     expect(parseExcludedPaths('reviews:\n  auto_review:\n    enabled: true\n')).toEqual([]);
     expect(parseExcludedPaths('')).toEqual([]);
+    /* Unparseable rather than absent: still nothing excluded, which asks for more review. */
+    expect(parseExcludedPaths('reviews: [unclosed')).toEqual([]);
   });
 });
 

@@ -1,3 +1,6 @@
+import picomatch from 'picomatch';
+import { parse } from 'yaml';
+
 /**
  * Which files the reviewer is actually asked to read.
  *
@@ -12,80 +15,46 @@
  * own decision rather than this file's: a change under an excluded path is unreviewed by policy
  * already. What would be wrong is for the gate to pretend otherwise and then be worked around
  * by hand, which is how #128 happened.
+ *
+ * **Both halves are libraries now, and that is the point of this version.** The first one parsed
+ * the YAML by hand and matched the globs by hand, and review found four defects in them: a `\Z`
+ * that is a Python idiom, a star after an escaped dot that expanded to "repeated dots", a
+ * `replace` that restored one globstar marker out of two, and a header comment that made the
+ * whole block invisible. Every one failed *open* — an exclusion list that silently comes back
+ * empty or matches nothing stops excluding, and the gate goes on reporting success. Four in a
+ * row is not a run of bad luck, it is the wrong tool, and `yaml` and `picomatch` were already
+ * in the tree.
  */
 
 /**
- * The exclusion globs from a `.coderabbit.yaml`, without a YAML parser.
+ * The exclusion globs from a `.coderabbit.yaml`.
  *
- * Deliberately narrow: it reads the `path_filters:` block and takes the quoted entries that
- * start with `!`. Anything it does not understand is simply not returned, and an empty list
- * means nothing is excluded — which fails toward asking for more review rather than less.
+ * Anything unparseable yields an empty list, which excludes nothing and therefore asks for more
+ * review rather than less — the safe direction for this file to fail in.
  *
  * @param {string} yaml
  * @returns {string[]}
  */
 export const parseExcludedPaths = (yaml) => {
-  /*
-   * A line scan rather than one regex over the block. The regex version terminated the block
-   * with `\Z`, which is a Python idiom — in JavaScript that matches a literal "Z", so a
-   * `path_filters:` block with nothing after it parsed as nothing at all. The scan has no
-   * end-of-input case to get wrong.
-   */
-  const lines = yaml.split('\n');
-  const start = lines.findIndex((line) => /^\s*path_filters:\s*$/.test(line));
-  if (start === -1) return [];
-
-  const out = [];
-  for (const line of lines.slice(start + 1)) {
-    if (/^\s*$/.test(line)) continue;
-    /* A key at any indentation ends the block; a list item continues it. */
-    if (!/^\s*-\s/.test(line)) break;
-    const entry = /^\s*-\s*['"]?!([^'"\s]+)['"]?\s*$/.exec(line);
-    if (entry !== null && entry[1] !== undefined) out.push(entry[1]);
+  /** @type {unknown} */
+  let doc;
+  try {
+    doc = parse(yaml);
+  } catch {
+    return [];
   }
-  return out;
+
+  const filters = /** @type {{ reviews?: { path_filters?: unknown } }} */ (doc)?.reviews
+    ?.path_filters;
+  if (!Array.isArray(filters)) return [];
+
+  return filters
+    .filter((entry) => typeof entry === 'string' && entry.startsWith('!'))
+    .map((entry) => String(entry).slice(1));
 };
 
-/**
- * Whether one glob matches one path.
- *
- * Supports the three forms the config actually uses — a literal name, a `**` spanning
- * directories, and a `*` within one segment. Every other regex character is escaped, so a
- * pattern with a dot in it matches a dot rather than any character.
- *
- * @param {string} pattern
- * @param {string} path
- * @returns {boolean}
- */
-export const matchesGlob = (pattern, path) => {
-  /*
-   * Placeholders, not a lookbehind.
-   *
-   * The first version escaped the regex characters and then skipped any `*` preceded by a dot,
-   * to avoid disturbing the `.*` that globstar expansion produces. That also skipped the `*` in
-   * `config.*` — whose preceding dot is an escaped literal — so the pattern compiled to
-   * `config\.*`, a regex matching `config`, `config.`, `config..` and nothing anyone wanted.
-   *
-   * Expanding into markers that contain no regex syntax removes the ambiguity: by the time the
-   * single-star rule runs there is no globstar output left for it to misread.
-   */
-  const GLOBSTAR_SLASH = '\u0000gss\u0000';
-  const GLOBSTAR = '\u0000gs\u0000';
-
-  const source = pattern
-    .replace(/\*\*\//g, GLOBSTAR_SLASH)
-    .replace(/\*\*/g, GLOBSTAR)
-    /* Escape everything with meaning in a regex, `*` included — it is restored below. */
-    .replace(/[.+^${}()|[\]\\*?]/g, (char) => `\\${char}`)
-    /* The single star, now unambiguous: one segment only, so `*.json` cannot cross a slash. */
-    .replace(/\\\*/g, '[^/]*')
-    /* `replaceAll`, because `replace` with a string argument replaces only the first match, so
-       a pattern with two globstars kept its second marker and matched nothing at all. */
-    .replaceAll(GLOBSTAR_SLASH, '(?:.*/)?')
-    .replaceAll(GLOBSTAR, '.*');
-
-  return new RegExp(`^${source}$`).test(path);
-};
+/** @param {string} pattern @param {string} path @returns {boolean} */
+export const matchesGlob = (pattern, path) => picomatch.isMatch(path, pattern, { dot: true });
 
 /**
  * @param {readonly string[]} excluded
