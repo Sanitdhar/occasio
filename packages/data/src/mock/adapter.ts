@@ -1005,20 +1005,17 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
   };
 
   /**
-   * Registered listeners. `subscribe()` below hands them out and takes them back; delivering to
-   * them is #36, which owns the emitter and the tests that prove an unsubscribe leaks nothing.
-   */
-  /**
-   * A subscription is a read, so it carries the scope the read had.
+   * A subscription is a read, so it carries the scope a read has — but only half of it.
    *
-   * Tenant, because a listener on one event must never see another's posts — the same rule every
-   * query obeys, and the one place it would be easiest to forget, since a listener is registered
-   * once and fires forever afterwards.
+   * The tenant is fixed at subscribe time, because it is what the caller asked to watch and
+   * cannot change underneath them. A listener on one event must never see another's posts, and
+   * this is the easiest place for that to be forgotten, since a listener is registered once and
+   * fires forever afterwards.
    *
-   * Statuses, resolved through `visibleModeration` at subscribe time rather than taken from the
-   * query as written: a guest asking to watch `pending` would otherwise receive other people's
-   * unapproved posts live, which is the moderation guarantee (D3) leaking through the one door
-   * that is not a query.
+   * The statuses are **not** resolved here. `asked` holds what the caller requested verbatim,
+   * and `visibleModeration` runs on every delivery instead — see `emitGossip`. Resolving them
+   * once was the first version and it was wrong: a subscription outlives the membership that
+   * opened it, so a demoted moderator went on receiving other people's unapproved bodies.
    */
   type GossipSubscription = {
     readonly tenantId: TenantId;
@@ -1262,11 +1259,15 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
     },
 
     /**
-     * Registers a listener and hands back an unsubscribe that is safe to call twice — which React
-     * effects do. **Nothing is delivered yet:** the emitter is #36, and building it here would
-     * put two issues in one PR (D35). What this does provide is the handshake the signature
-     * promises — the promise resolves once the subscription exists, so "connected and quiet" is
-     * already distinguishable from "never connected".
+     * Registers a listener and hands back an unsubscribe that is safe to call twice — which
+     * React effects do on a fast unmount.
+     *
+     * `scope` is what refuses an outsider a subscription at all, and its answer is deliberately
+     * not kept: what the listener may *see* is recomputed on every delivery, because the
+     * membership behind it can change while the screen is still open.
+     *
+     * The promise resolves once the subscription exists, so "connected and quiet" stays
+     * distinguishable from "never connected".
      */
     subscribe: async (
       tenantId: TenantId,

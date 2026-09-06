@@ -3,6 +3,7 @@ import { tenantId, userId, type UserId } from '@occasio/core';
 import { FIXTURE_SEED } from '../fixtures/index';
 import type { GossipChange } from '../repositories';
 import { createMockAdapter, type MockAdapter } from './adapter';
+import { createSeededRandom } from './random';
 import { createMemoryStorage } from './storage';
 
 /**
@@ -27,12 +28,25 @@ const FESTIVAL = tenantId('t_anandhara');
 const MODERATOR = userId('u_meera');
 const ADMIN = userId('u_sanit');
 
+/**
+ * Deterministic on purpose.
+ *
+ * `createMockAdapter` defaults `random` to `Math.random` and `now` to `new Date()`, so every run
+ * mints different post ids, persona labels and timestamps. Nothing here asserts on those today,
+ * so nothing is flaky — but a failure that cannot be replayed with the same data is a failure
+ * someone has to reproduce by guessing, and the first case that asserts on an id would inherit
+ * the problem silently.
+ */
+const FIXED_NOW = new Date('2026-07-01T09:00:00.000Z');
+
 const adapterFor = (as: UserId): MockAdapter =>
   createMockAdapter({
     currentUserId: as,
     seed: FIXTURE_SEED,
     storage: createMemoryStorage(),
     latency: { minMs: 0, maxMs: 0 },
+    random: createSeededRandom(1),
+    now: () => FIXED_NOW,
   });
 
 const ALL = ['pending', 'approved', 'rejected', 'hidden'] as const;
