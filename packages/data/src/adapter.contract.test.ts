@@ -194,6 +194,65 @@ describe.each(SUBJECTS)('$name adapter', ({ create }: Subject) => {
     });
   });
 
+  describe('the join code (the way in when there is no URL bar)', () => {
+    it('resolves an event from a code however it was transcribed', async () => {
+      /* Somebody is reading a printed card. Case, spaces and hyphens are theirs to get wrong,
+         and the fixture's own code is the one being typed. */
+      const adapter = await create(OUTSIDER);
+
+      for (const typed of ['SANRIY26', 'sanriy26', 'san riy 26', ' SAN-RIY-26 ']) {
+        const tenant = await adapter.directory.byJoinCode(typed);
+        expect([typed, tenant.slug]).toEqual([typed, 'sanit-riyanks']);
+      }
+    });
+
+    it('opens a private event to somebody outside it, which the slug does not', async () => {
+      /*
+       * The whole difference between the two lookups, and the reason this method exists rather
+       * than a visibility exception on `bySlug`. The reunion is private: an outsider guessing
+       * its slug must be told it does not exist, and the same outsider holding its printed code
+       * must get in — the code is what makes them not a stranger.
+       */
+      const adapter = await create(OUTSIDER);
+
+      const joined = await adapter.directory.byJoinCode('MAPLE99');
+      expect(joined.slug).toBe('maple-1999');
+
+      await rejectsWith(
+        adapter.directory.bySlug(joined.slug),
+        isNotFoundError,
+        'NotFoundError for a private event resolved by slug',
+      );
+    });
+
+    it('raises NotFound for a code nobody holds', async () => {
+      const adapter = await create(OUTSIDER);
+
+      await rejectsWith(
+        adapter.directory.byJoinCode('NOSUCHCODE'),
+        isNotFoundError,
+        'NotFoundError for an unknown join code',
+      );
+    });
+
+    it('never opens an event that has no code', async () => {
+      /*
+       * Two of the four fixture events carry `join_code: null`, and an empty field normalises to
+       * nothing — so a rule that compared the two directly would open both of them to anybody
+       * who pressed enter. This is the case that has to fail.
+       */
+      const adapter = await create(OUTSIDER);
+
+      for (const typed of ['', '   ', '---']) {
+        await rejectsWith(
+          adapter.directory.byJoinCode(typed),
+          isNotFoundError,
+          `NotFoundError for the empty code ${JSON.stringify(typed)}`,
+        );
+      }
+    });
+  });
+
   describe('not found', () => {
     it('raises NotFound for an id that does not exist', async () => {
       const adapter = await create(WEDDING_ADMIN);

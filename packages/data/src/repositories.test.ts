@@ -245,9 +245,17 @@ describe('tenantId is the first argument (the rule that prevents cross-tenant le
     expect(offenders).toEqual([]);
   });
 
-  it('leaves TenantDirectory as the only cross-tenant surface, at exactly two methods', () => {
+  it('leaves TenantDirectory as the only cross-tenant surface, at exactly three methods', () => {
+    /*
+     * Named rather than counted, and updated deliberately: this assertion is the gate that makes
+     * a third cross-tenant method a decision somebody writes down. `byJoinCode` is that
+     * decision — native has no URL bar (ADR-0003), so a printed code is the only way in at a
+     * real event, and a code cannot be resolved by anything that already holds a tenant. The
+     * reasoning lives on the type in repositories.ts.
+     */
     expect(directory).toBeDefined();
     expect(directory?.methods.map((method) => method.name).sort()).toEqual([
+      'byJoinCode',
       'bySlug',
       'listForUser',
     ]);

@@ -25,6 +25,7 @@ export type { FeatureKey, TenantConfig } from './config';
 export { FEATURE_KEYS } from './config';
 
 export { DATA_ERROR_CODES } from './errors';
+export { joinCodeMatches, normaliseJoinCode } from './joinCode';
 export type { DataErrorCode, ValidationIssue } from './errors';
 export {
   DataError,
