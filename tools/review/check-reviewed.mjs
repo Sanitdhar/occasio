@@ -48,8 +48,20 @@ const headers = () => {
   return h;
 };
 
+/**
+ * A stalled socket is not a slow answer, it is no answer.
+ *
+ * Without this, one unresponsive connection holds the request until the CI job's own timeout —
+ * so a gate that exists to answer in seconds fails the build twenty minutes later, with a
+ * cancellation notice rather than a verdict. Thirty seconds is far past any healthy response
+ * from this API and far short of anything a person would wait through.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
+const request = (url) =>
+  fetch(url, { headers: headers(), signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+
 const api = async (path) => {
-  const res = await fetch(`https://api.github.com${path}`, { headers: headers() });
+  const res = await request(`https://api.github.com${path}`);
   if (!res.ok) throw new Error(`${path} -> ${String(res.status)} ${res.statusText}`);
   return res.json();
 };
@@ -59,7 +71,7 @@ const apiAll = async (path) => {
   const out = [];
   for (let page = 1; page <= 20; page += 1) {
     const url = `https://api.github.com${path}${path.includes('?') ? '&' : '?'}per_page=100&page=${String(page)}`;
-    const res = await fetch(url, { headers: headers() });
+    const res = await request(url);
     if (!res.ok) throw new Error(`${path} -> ${String(res.status)} ${res.statusText}`);
     const batch = await res.json();
     if (!Array.isArray(batch) || batch.length === 0) break;

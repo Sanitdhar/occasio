@@ -211,9 +211,27 @@ export const evaluate = async ({ api, apiAll, repo, pr, excludedPaths = [] }) =>
    * a commit proposing the same effective diff as the head, the review still applies. Any real
    * edit changes the patches and this stops helping, which is the point.
    */
-  const reviewedSha = [...submittedReviews]
-    .sort((a, b) => (a.submitted_at < b.submitted_at ? -1 : 1))
-    .at(-1)?.commit_id;
+  /*
+   * Which commit the newest review sat on.
+   *
+   * Claude's review comments count here on the same condition they count as evidence, and for a
+   * reason that only shows up after a rebase: on a rate-limited pull request there is no
+   * CodeRabbit review to take a sha from, so this stayed undefined, `sameDiffAsReviewed` could
+   * never answer, and the PR went permanently stale the first time `main` moved. D42 gives the
+   * fallback no re-review trigger either, so nothing would have rescued it.
+   *
+   * Review comments only, never issue comments: a review comment is bound to a commit and an
+   * issue comment is not, and a sha invented for an unbound comment would be a guess about
+   * which code was read.
+   */
+  const shaCandidates = [
+    ...submittedReviews.map((r) => ({ at: r.submitted_at, sha: r.commit_id })),
+    ...(rateLimited
+      ? reviewComments.filter(byClaude).map((c) => ({ at: c.created_at, sha: c.commit_id }))
+      : []),
+  ].filter((candidate) => candidate.at != null && candidate.sha != null);
+
+  const reviewedSha = shaCandidates.sort((a, b) => (a.at < b.at ? -1 : 1)).at(-1)?.sha;
 
   /**
    * Whether everything the head proposes was part of what the review read.
