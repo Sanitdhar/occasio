@@ -35,11 +35,22 @@ export const COMPARE_FILE_CAP = 300;
  * @param {string} patch
  * @returns {string}
  */
-const changedLines = (patch) =>
-  patch
-    .split('\n')
-    .filter((line) => /^[+-]/.test(line) && !/^(\+\+\+|---)/.test(line))
-    .join('\n');
+const changedLines = (patch) => {
+  /*
+   * File headers are recognised by position, not by prefix.
+   *
+   * `+++` and `---` introduce the two filenames, and they appear only before the first hunk.
+   * Filtering on the prefix instead also discarded a line adding `++counter;` — encoded as
+   * `+++counter;` — and one removing `--counter;`. Dropping a changed line is the fail-open
+   * direction: two different patches fingerprint the same, and the gate reports a review that
+   * never happened.
+   */
+  const lines = patch.split('\n');
+  const firstHunk = lines.findIndex((line) => line.startsWith('@@'));
+  const body = firstHunk === -1 ? lines : lines.slice(firstHunk);
+
+  return body.filter((line) => line.startsWith('+') || line.startsWith('-')).join('\n');
+};
 
 /**
  * Whether a file carries enough to tell one version of it from another.
@@ -83,7 +94,11 @@ export const diffEntries = (files) =>
        * change invisible here — two different images would fingerprint identically.
        */
       const body =
-        file.patch === undefined ? `binary:${file.sha ?? 'unknown'}` : changedLines(file.patch);
+        /* Nullish: `patch` arrives as `null` for a binary file as readily as absent, and
+           splitting null would throw inside the comparison rather than answer it. */
+        (file.patch ?? null) === null
+          ? `binary:${file.sha ?? 'unknown'}`
+          : changedLines(String(file.patch));
       /* The status matters on its own: deleting a file and adding it back with the same
          contents is not the same change as leaving it alone. */
       return `${name}\n${from}\n${file.status ?? 'unknown'}\n${body}`;

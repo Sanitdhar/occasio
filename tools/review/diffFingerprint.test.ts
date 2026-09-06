@@ -49,6 +49,40 @@ describe('diffFingerprint', () => {
     expect(diffFingerprint([before])).toBe(diffFingerprint([rebased]));
   });
 
+  it('keeps a changed line that begins with a plus or a minus', () => {
+    /*
+     * `++counter;` added is encoded `+++counter;`, and `--counter;` removed is `---counter;`.
+     * A filter that recognised file headers by prefix dropped both — and dropping a changed
+     * line is the fail-open direction: two different patches fingerprint the same, and the gate
+     * reports a review that never happened.
+     */
+    const increments = file({ patch: '@@ -1,2 +1,3 @@\n const a = 1;\n+++counter;' });
+    const decrements = file({ patch: '@@ -1,2 +1,3 @@\n const a = 1;\n+--counter;' });
+
+    expect(diffFingerprint([increments])).not.toBe(diffFingerprint([decrements]));
+    expect(diffFingerprint([increments])).toContain('++counter;');
+  });
+
+  it('still drops the filename headers themselves', () => {
+    /* They precede the first hunk, which is how they are told apart now. Keeping them would
+       make a rename look like a content change. */
+    const withHeaders = file({
+      patch: '--- a/src/x.ts\n+++ b/src/x.ts\n@@ -1 +1 @@\n-old\n+new',
+    });
+    const withoutHeaders = file({ patch: '@@ -1 +1 @@\n-old\n+new' });
+
+    expect(diffFingerprint([withHeaders])).toBe(diffFingerprint([withoutHeaders]));
+  });
+
+  it('does not throw on a null patch', () => {
+    /* `patch` arrives as `null` for a binary file as readily as absent, and splitting null
+       would throw inside the comparison rather than answer it. */
+    const binary = { filename: 'assets/hero.png', status: 'modified', patch: null, sha: 'abc' };
+
+    expect(() => diffFingerprint([binary])).not.toThrow();
+    expect(diffFingerprint([binary])).toContain('binary:abc');
+  });
+
   it('still notices a different line arriving in the same place', () => {
     /* The property the rule above must not cost: what was added is still compared. */
     const added = file({ patch: '@@ -1,3 +1,4 @@\n const a = 1;\n+const added = 2;' });
