@@ -165,9 +165,14 @@ describe.each(SUBJECTS)('$name adapter', ({ create }: Subject) => {
       const adapter = await create(WEDDING_ADMIN);
       const wanted = MAX_PAGE_SIZE + 1;
       const existing = await adapter.gossip.list(WEDDING, ANY_STATUS, { limit: MAX_PAGE_SIZE });
-      for (let i = existing.items.length; i < wanted; i += 1) {
-        await adapter.gossip.create(WEDDING, { body: `Filler ${String(i)}`, mediaId: null });
-      }
+      /* Concurrently, because a remote subject would otherwise spend two hundred serial round
+         trips inside one case. The assertion is about the resulting page size, not about the
+         order rows were written in, so nothing here depends on them being sequential. */
+      await Promise.all(
+        Array.from({ length: wanted - existing.items.length }, (_, i) =>
+          adapter.gossip.create(WEDDING, { body: `Filler ${String(i)}`, mediaId: null }),
+        ),
+      );
 
       const huge = await adapter.gossip.list(WEDDING, ANY_STATUS, { limit: 10_000 });
 
@@ -245,6 +250,22 @@ describe.each(SUBJECTS)('$name adapter', ({ create }: Subject) => {
         guest.gossip.moderate(WEDDING, post.id, { status: 'hidden', reason: 'no' }),
         isForbiddenError,
         'ForbiddenError for moderating without the role',
+      );
+    });
+
+    it('refuses an outsider a subscription at all', async () => {
+      /*
+       * The only thing standing between a non-member and a live feed of an event's posts is the
+       * membership check inside `subscribe`. Nothing else covered it: every other case in this
+       * suite and in the mock's own tests holds a membership, so removing that check left them
+       * all green while an outsider could open a channel and watch.
+       */
+      const outsider = await create(OUTSIDER);
+
+      await rejectsWith(
+        outsider.gossip.subscribe(WEDDING, ANY_STATUS, () => undefined),
+        isForbiddenError,
+        'ForbiddenError for subscribing to an event the caller is not in',
       );
     });
 
