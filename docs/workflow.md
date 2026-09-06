@@ -129,6 +129,11 @@ was able to reach. That exercises everything that was unverified — checkout, a
 without producing the second review the decision prohibits. Run it against any open PR;
 it will not comment on the code.
 
+The comment it posts carries counts and nothing quoted from the pull request. Everything
+`gh pr view` and `gh pr diff` return is written by whoever opened it, and on a public repo that
+is anyone — the prompt says so explicitly, in both modes, because a validation run reads exactly
+the same attacker-controlled text a review does.
+
 The manual trigger exists because for its first nine runs this workflow was `skipped` every
 time: no budget had run out, so the `if:` had never matched and not one step had ever executed
 (#142). Everything about it was an assumption — the login it posts as, whether `allowed_bots`
