@@ -110,7 +110,35 @@ const submitted = reviews.filter((r) => byReviewer(r) && r.submitted_at != null)
 const byClaude = (item) => (item.user?.login ?? '') === CLAUDE_REVIEWER_LOGIN;
 const claudeFindings = reviewComments.filter(byClaude).length;
 const claudeComment = issueComments.some(byClaude);
-const claudeReviewed = claudeFindings > 0 || claudeComment;
+/*
+ * Claude counts as a reviewer only where D42 puts it: standing in for CodeRabbit after the
+ * budget ran out. Without the `rateLimited` conjunct, any Claude comment on any PR — a reply in
+ * a thread, an answer to a question, anything the app posts — satisfied this gate, so the
+ * fallback reviewer doubled as a way to skip review entirely.
+ */
+const claudeReviewed = rateLimited && (claudeFindings > 0 || claudeComment);
+
+/*
+ * When the newest review happened, and when the code it would have read was written.
+ *
+ * A review is of a commit, not of a pull request. Push a fix after the review and the PR still
+ * carries a walkthrough, findings and a submitted review — every signal below is still true —
+ * while the diff that is about to land has been read by nobody. On #134 that was a 374-line
+ * commit changing who may read invitation contact details, eight minutes after the review it
+ * appeared to have.
+ */
+const timestamps = [
+  ...reviews.filter((r) => byReviewer(r) || byClaude(r)).map((r) => r.submitted_at),
+  ...reviewComments.filter((c) => byReviewer(c) || byClaude(c)).map((c) => c.created_at),
+  ...issueComments.filter((c) => byReviewer(c) || byClaude(c)).map((c) => c.created_at),
+].filter((value) => value != null);
+const lastReviewAt = timestamps.length === 0 ? null : timestamps.sort().at(-1);
+
+const headCommit = await apiOne(`/repos/${REPO}/commits/${prData.head.sha}`);
+const headAt = headCommit.commit?.committer?.date ?? null;
+/* Unknown timestamps must not read as fresh: an absent one is a reason to look, not to pass. */
+const stale =
+  lastReviewAt === null || headAt === null ? false : Date.parse(headAt) > Date.parse(lastReviewAt);
 
 const reviewed = walkthrough || findings > 0 || submitted > 0 || claudeReviewed;
 
@@ -123,6 +151,19 @@ console.log(`  findings    : ${String(findings)}`);
 console.log(`  reviews     : ${String(submitted)}`);
 console.log(`  rate limited: ${String(rateLimited)}`);
 console.log(`  claude      : ${String(claudeReviewed)} (findings: ${String(claudeFindings)})`);
+console.log(`  last review : ${lastReviewAt ?? 'none'}`);
+console.log(`  head commit : ${prData.head.sha.slice(0, 7)} ${headAt ?? 'unknown'}`);
+
+if (reviewed && stale) {
+  console.error(
+    `\nNOT REVIEWED. Head commit ${prData.head.sha.slice(0, 7)} (${String(headAt)}) is newer than the last review (${String(lastReviewAt)}).`,
+  );
+  console.error(
+    'The pull request has been reviewed; the code about to merge has not. Wait for the',
+  );
+  console.error('incremental review of this commit, which normally lands within a few minutes.');
+  process.exit(1);
+}
 
 if (!reviewed) {
   console.error(
