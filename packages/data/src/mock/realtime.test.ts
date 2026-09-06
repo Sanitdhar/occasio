@@ -25,6 +25,7 @@ const WEDDING = tenantId('t_sanit-riyanks');
 const FESTIVAL = tenantId('t_anandhara');
 /** Moderates both events, which is what makes the tenant filter observable at all. */
 const MODERATOR = userId('u_meera');
+const ADMIN = userId('u_sanit');
 
 const adapterFor = (as: UserId): MockAdapter =>
   createMockAdapter({
@@ -267,6 +268,42 @@ describe('gossip subscriptions', () => {
        from, which is worse than the exception it replaced. */
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]?.[1]).toBeInstanceOf(Error);
+  });
+
+  it('stops showing unapproved posts once the subscriber loses the role', async () => {
+    /*
+     * A subscription outlives the membership that opened it. Resolving the permission once at
+     * subscribe time meant a demoted moderator kept receiving other people's pending bodies
+     * down a channel they were no longer entitled to — an authorization decision made once and
+     * then trusted for the life of a screen, which is the shape most likely to survive review.
+     *
+     * The admin demotes themselves, which is a real thing an organiser does when handing over,
+     * and is also the only way to express this in the mock: an adapter instance is one client
+     * with its own in-memory state, so a change made by a *different* client would not be
+     * visible here at all. The mechanism under test is the same either way — the permission is
+     * recomputed at delivery rather than remembered.
+     */
+    const adapter = adapterFor(ADMIN);
+    const seen: GossipChange[] = [];
+
+    const stop = await adapter.gossip.subscribe(WEDDING, { statuses: ALL }, (change) => {
+      seen.push(change);
+    });
+    await adapter.gossip.create(WEDDING, { body: 'While still an admin', mediaId: null });
+    const beforeDemotion = seen.length;
+
+    const membership = await adapter.memberships.findForUser(WEDDING, ADMIN);
+    expect(membership).not.toBeNull();
+    if (membership === null) return;
+    await adapter.memberships.setRole(WEDDING, membership.id, 'attendee');
+
+    await adapter.gossip.create(WEDDING, { body: 'After the handover', mediaId: null });
+    stop();
+
+    expect(beforeDemotion).toBeGreaterThan(0);
+    /* A pending post is a moderator's to see and an attendee's not to — including their own,
+       which `list` also withholds until it is approved. */
+    expect(seen).toHaveLength(beforeDemotion);
   });
 
   it('filters by the statuses the listener asked for', async () => {

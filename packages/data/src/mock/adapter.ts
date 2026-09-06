@@ -1022,7 +1022,8 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
    */
   type GossipSubscription = {
     readonly tenantId: TenantId;
-    readonly statuses: readonly ModerationStatus[];
+    /** What the caller asked to watch. What they are *allowed* to see is resolved per delivery. */
+    readonly asked: readonly ModerationStatus[];
     readonly listener: (change: GossipChange) => void;
   };
 
@@ -1054,8 +1055,24 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
     for (const subscription of [...gossipListeners]) {
       if (subscription.tenantId !== tenant) continue;
 
-      const wasVisible = previousStatus !== null && subscription.statuses.includes(previousStatus);
-      const isVisible = subscription.statuses.includes(item.status);
+      /*
+       * Permission is resolved per delivery, not once at subscribe time.
+       *
+       * A subscription outlives the membership that opened it. Demote a moderator with
+       * `memberships.setRole`, or revoke them outright, and a cached answer keeps posting other
+       * people's unapproved bodies down a channel they are no longer entitled to — an
+       * authorization decision made once and then trusted for the life of a screen.
+       *
+       * `state` rather than a captured snapshot, because the membership table may have changed
+       * since the write that triggered this, and the newest answer is the right one.
+       */
+      const live =
+        state === null ? null : findActiveMembership(state.tables.memberships, tenant, me);
+      if (live === null) continue;
+
+      const statuses = visibleModeration(live, subscription.asked);
+      const wasVisible = previousStatus !== null && statuses.includes(previousStatus);
+      const isVisible = statuses.includes(item.status);
       if (!wasVisible && !isVisible) continue;
 
       /*
@@ -1256,12 +1273,10 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
       query: GossipQuery,
       listener: (change: GossipChange) => void,
     ): Promise<Unsubscribe> => {
-      const { membership } = await scope(tenantId, 'gossip.subscribe');
-      const subscription: GossipSubscription = {
-        tenantId,
-        statuses: visibleModeration(membership, query.statuses),
-        listener,
-      };
+      await scope(tenantId, 'gossip.subscribe');
+      /* `scope` is what refuses an outsider a subscription at all; its membership is not kept,
+         because `emitGossip` recomputes the answer rather than remembering it. */
+      const subscription: GossipSubscription = { tenantId, asked: query.statuses, listener };
       gossipListeners.add(subscription);
 
       let closed = false;
