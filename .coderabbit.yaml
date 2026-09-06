@@ -39,6 +39,10 @@ reviews:
       - ^fix/.*
       - ^chore/.*
       - ^docs/.*
+      # `review/*` carries the retro-review branches — a baseline branch a PR is opened against
+      # so CodeRabbit will read code that already merged. Omitting it meant the one PR shape
+      # whose entire purpose is being reviewed was the one shape auto review skipped (#135).
+      - ^review/.*
 
   path_filters:
     - '!package-lock.json'

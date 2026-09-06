@@ -2,6 +2,8 @@
 
 export type ReviewVerdict = {
   title: string;
+  baseRef: string | null;
+  autoReviewedBase: boolean | null;
   headSha: string | null;
   headAt: string | null;
   reviewerState: string;
@@ -29,4 +31,5 @@ export declare const evaluate: (options: {
   repo: string;
   pr: string | number;
   excludedPaths?: readonly string[];
+  baseBranches?: readonly string[] | null;
 }) => Promise<ReviewVerdict>;

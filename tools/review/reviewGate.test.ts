@@ -51,6 +51,8 @@ type Objects = Record<string, () => unknown>;
 type Lists = Record<string, () => unknown[]>;
 
 type Scenario = {
+  baseRef?: string;
+  baseBranches?: string[] | null;
   headSha?: string;
   headAt?: string | null;
   issueComments?: unknown[];
@@ -81,7 +83,7 @@ const run = async (scenario: Scenario = {}) => {
     [`/repos/${REPO}/pulls/${PR}`]: () => ({
       title: 'a pull request',
       head: { sha: headSha },
-      base: { ref: 'main' },
+      base: { ref: scenario.baseRef ?? 'main' },
     }),
     [`/repos/${REPO}/commits/${headSha}/status`]: () => ({
       statuses: [{ context: 'CodeRabbit', state: 'success', description: 'Review completed' }],
@@ -116,6 +118,7 @@ const run = async (scenario: Scenario = {}) => {
     repo: REPO,
     pr: PR,
     excludedPaths: scenario.excludedPaths ?? ['package-lock.json', '**/__screenshots__/**'],
+    baseBranches: scenario.baseBranches === undefined ? ['^main$'] : scenario.baseBranches,
   });
 
   return { verdict, asked, unrouted };
@@ -370,6 +373,36 @@ describe('the review gate', () => {
       expect(unrouted).toEqual([]);
       expect(asked).toContain(comparePath(REVIEWED));
       expect(verdict).toMatchObject({ rebasedOnly: false, stale: true, ok: false });
+    });
+  });
+
+  describe('why a pull request is unreviewed', () => {
+    it('reports a base branch auto review was never configured for', async () => {
+      /*
+       * #132 targeted `review/unreviewed-baseline`, matched no pattern, and was skipped in
+       * silence — indistinguishable from a PR waiting its turn, for seven and a half hours.
+       * The verdict is unchanged either way; what changes is whether waiting is the right
+       * response, and here it never is.
+       */
+      const v = await gate({
+        baseRef: 'review/unreviewed-baseline',
+        baseBranches: ['^main$', '^feat/.*'],
+        issueComments: [],
+      });
+      expect(v).toMatchObject({ reviewed: false, autoReviewedBase: false, ok: false });
+      expect(v.baseRef).toBe('review/unreviewed-baseline');
+    });
+
+    it('does not blame the base branch when it is configured', async () => {
+      /* A PR simply waiting its turn must not be told to go and edit the reviewer's config. */
+      const v = await gate({ baseBranches: ['^main$'], issueComments: [] });
+      expect(v).toMatchObject({ reviewed: false, autoReviewedBase: true });
+    });
+
+    it('says nothing when there is no configuration to judge against', async () => {
+      /* Null, not false. "We cannot tell" must not print as "this can never be reviewed". */
+      const v = await gate({ baseBranches: null, issueComments: [] });
+      expect(v).toMatchObject({ reviewed: false, autoReviewedBase: null });
     });
   });
 
