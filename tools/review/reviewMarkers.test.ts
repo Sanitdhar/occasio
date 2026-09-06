@@ -57,8 +57,19 @@ describe('isFullReviewFinished', () => {
   });
 
   it('survives a missing or non-string body rather than throwing', () => {
-    /* The gate reads whatever the API returned. A body that is absent is not a review. */
+    /*
+     * The gate reads whatever the API returned. A body that is absent is not a review.
+     *
+     * The symbol is the case that earns the `String(...)` conversion rather than a bare
+     * `body ?? ''`: nullish values coalesce to the empty string under either, so they cannot
+     * tell the two apart, and a symbol is the one input a regular expression refuses to
+     * stringify — `RegExp.test` throws on it instead of answering false. The gate turning a
+     * surprising payload into a crash is the gate not answering at all.
+     */
     expect(isFullReviewFinished(undefined)).toBe(false);
     expect(isFullReviewFinished(null)).toBe(false);
+    expect(isFullReviewFinished(Symbol('body'))).toBe(false);
+    expect(isFullReviewFinished({ body: 'Full review finished.' })).toBe(false);
+    expect(isFullReviewFinished(42)).toBe(false);
   });
 });
