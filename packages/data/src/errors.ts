@@ -121,6 +121,13 @@ export class ValidationError extends DataError {
      * through the caller's array and leaves the shorter one wide open: the entries were shared,
      * so `issues[0].message = '…'` reached straight into the error.
      *
+     * The two fields by name rather than `{ ...issue }`. A spread copies own enumerable
+     * properties, and a `ValidationIssue` is a structural type: an object whose `path` and
+     * `message` come from a prototype getter, or from a property defined as non-enumerable,
+     * satisfies it completely and spreads to `{}`. `describe` reads the values directly, so
+     * the message would come out right and `issues[0]` would be empty — the same error
+     * describing itself two ways, rebuilt by the line meant to prevent it.
+     *
      * Frozen as well as copied, because that is the only route left and it runs the other way —
      * `error.issues[0].message = '…'` on the error's own copy. `readonly` is erased at build
      * time and stops nobody at runtime. Under a module's strict mode the assignment now throws
@@ -128,7 +135,9 @@ export class ValidationError extends DataError {
      * is a bug in the caller either way, and the alternative to a loud failure here is silently
      * reintroducing the exact defect this constructor exists to prevent.
      */
-    this.issues = Object.freeze(issues.map((issue) => Object.freeze({ ...issue })));
+    this.issues = Object.freeze(
+      issues.map((issue) => Object.freeze({ path: issue.path, message: issue.message })),
+    );
   }
 
   private static describe(issues: readonly ValidationIssue[]): string {
