@@ -1,38 +1,22 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { act, render, screen } from '@testing-library/react';
 import { AccessibilityInfo } from 'react-native';
+import { resetReducedMotion, setReducedMotion } from '../../../../test/setup/mediaQuery';
 import { useReducedMotion } from './useReducedMotion';
 
 /**
  * The promise this hook makes is about the *first* render, not eventually.
  *
  * `AccessibilityInfo.isReduceMotionEnabled()` is asynchronous, so a hook that started at
- * `false` would play one frame of animation to the one person who asked for none, and would
- * leave the visual gate screenshotting a page mid-transition — Playwright sets the preference
- * before load, and an async-only read has not seen it yet when the first frame is captured
- * (#129). Everything below is therefore asserted synchronously, before any effect has settled.
+ * `false` and corrected itself a tick later would play one frame of animation to the one person
+ * who asked for none, and would leave the visual gate screenshotting a page mid-transition —
+ * Playwright sets the preference before load, and an async-only read has not seen it when the
+ * first frame is captured (#129).
+ *
+ * The preference is driven through the real `matchMedia` that react-native-web reads, installed
+ * before any module loads (test/setup/mediaQuery.ts), so these assert the library's own
+ * translation rather than a stub standing in for it.
  */
-
-type Listener = (event: { matches: boolean }) => void;
-
-/** jsdom has no `matchMedia`; this is the smallest one that answers the query truthfully. */
-const stubMatchMedia = (reduce: boolean): void => {
-  const listeners = new Set<Listener>();
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    writable: true,
-    value: (query: string) => ({
-      matches: query.includes('prefers-reduced-motion') && reduce,
-      media: query,
-      onchange: null,
-      addEventListener: (_: string, fn: Listener) => listeners.add(fn),
-      removeEventListener: (_: string, fn: Listener) => listeners.delete(fn),
-      addListener: (fn: Listener) => listeners.add(fn),
-      removeListener: (fn: Listener) => listeners.delete(fn),
-      dispatchEvent: () => true,
-    }),
-  });
-};
 
 function Probe() {
   const reduced = useReducedMotion();
@@ -41,11 +25,12 @@ function Probe() {
 
 describe('useReducedMotion', () => {
   afterEach(() => {
+    resetReducedMotion();
     jest.restoreAllMocks();
   });
 
   it('reports the preference on the very first render, not a tick later', () => {
-    stubMatchMedia(true);
+    setReducedMotion(true);
     render(<Probe />);
 
     /* Read immediately: no `await`, no `act` flush. If this needed one, the first painted frame
@@ -54,23 +39,22 @@ describe('useReducedMotion', () => {
   });
 
   it('reports false when the preference is not set', () => {
-    stubMatchMedia(false);
     render(<Probe />);
 
     expect(screen.getByTestId('reduced').textContent).toBe('false');
   });
 
-  it('does not throw where there is no matchMedia at all', () => {
-    /* Native, and a server render. The initialiser has to survive both rather than assume a
-       browser, since this hook is in the app shell that renders on every platform. */
-    Object.defineProperty(window, 'matchMedia', {
-      configurable: true,
-      writable: true,
-      value: undefined,
+  it('follows the preference changing while the app is open', async () => {
+    /* Both platforms allow it from a control centre, and a browser follows the OS. */
+    render(<Probe />);
+    expect(screen.getByTestId('reduced').textContent).toBe('false');
+
+    await act(async () => {
+      setReducedMotion(true);
+      await Promise.resolve();
     });
 
-    expect(() => render(<Probe />)).not.toThrow();
-    expect(screen.getByTestId('reduced').textContent).toBe('false');
+    expect(screen.getByTestId('reduced').textContent).toBe('true');
   });
 
   it('does not let the initial read undo a change that arrived first', async () => {
@@ -80,28 +64,23 @@ describe('useReducedMotion', () => {
      * them. Toggling the setting during the first render would otherwise be undone a moment
      * later by a promise carrying the value from before the toggle: the preference reverting on
      * its own, which nobody reports because nobody believes it.
+     *
+     * Only the initial read is stubbed, and only to hold it open; the change travels the real
+     * path, so what is asserted is the ordering rather than a mock of it.
      */
-    stubMatchMedia(false);
-
-    let resolveInitial: (value: boolean) => void = () => undefined;
+    const deferred: { resolve: (value: boolean) => void } = { resolve: () => undefined };
     jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockReturnValue(
       new Promise<boolean>((resolve) => {
-        resolveInitial = resolve;
+        deferred.resolve = resolve;
       }),
     );
-
-    let emitChange: (enabled: boolean) => void = () => undefined;
-    jest.spyOn(AccessibilityInfo, 'addEventListener').mockImplementation((_event, handler) => {
-      emitChange = handler as (enabled: boolean) => void;
-      return { remove: () => undefined };
-    });
 
     render(<Probe />);
     expect(screen.getByTestId('reduced').textContent).toBe('false');
 
-    /* The person turns it on while the initial read is still in flight. */
-    act(() => {
-      emitChange(true);
+    await act(async () => {
+      setReducedMotion(true);
+      await Promise.resolve();
     });
     expect(screen.getByTestId('reduced').textContent).toBe('true');
 
@@ -109,9 +88,15 @@ describe('useReducedMotion', () => {
 
        Awaited, and the callback is async: resolving a promise queues a microtask, and a
        synchronous `act` returns before it runs — which made the first version of this test pass
-       against the bug it was written for. */
+       against the very bug it was written for. */
     await act(async () => {
-      resolveInitial(false);
+      deferred.resolve(false);
+      await Promise.resolve();
+    });
+    /* A second empty act, because the value has to travel promise -> setState -> render, and
+       one flush only gets it partway. Without this the assertion runs before the stale read
+       could have done any damage, and the test passes whether or not the guard exists. */
+    await act(async () => {
       await Promise.resolve();
     });
 
