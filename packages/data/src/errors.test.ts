@@ -104,6 +104,43 @@ describe('ValidationError', () => {
     issues.push({ path: 'mediaId', message: 'unknown media' });
     expect(error.issues).toHaveLength(1);
   });
+
+  it('copies each issue, not just the array holding them', () => {
+    /*
+     * `[...issues]` closed the longer route and left the shorter one open: the entries were
+     * shared, so this assignment used to reach straight into the error. `message` is built once
+     * in the constructor, so the result was one error object describing itself two ways —
+     * `issues[0].message` saying one thing and `error.message` still saying the other.
+     */
+    const issue = { path: 'body', message: 'must not be empty' };
+    const error = new ValidationError([issue]);
+
+    issue.message = 'something else entirely';
+
+    expect(error.issues[0]?.message).toBe('must not be empty');
+    expect(error.message).toContain('must not be empty');
+  });
+
+  it('will not let the error’s own copy drift from its message either', () => {
+    /*
+     * The same desync from the other side. `readonly` is erased at build time and stops nobody
+     * at runtime, so the issues are frozen: under a module's strict mode this throws instead of
+     * quietly reintroducing the defect the copy above exists to prevent.
+     */
+    const error = new ValidationError([{ path: 'body', message: 'must not be empty' }]);
+
+    expect(() => {
+      const [first] = error.issues;
+      if (first !== undefined) Object.assign(first, { message: 'rewritten' });
+    }).toThrow(TypeError);
+
+    expect(error.issues[0]?.message).toBe('must not be empty');
+    /* The array too, not only the entries — otherwise an issue could still be appended to an
+       error whose message was built before it existed. Asserted through `Object.isFrozen`
+       rather than by calling `push`, which `readonly ValidationIssue[]` does not offer and
+       which reaching for a cast to obtain would be its own lint error. */
+    expect(Object.isFrozen(error.issues)).toBe(true);
+  });
 });
 
 describe('the narrowing guards', () => {
