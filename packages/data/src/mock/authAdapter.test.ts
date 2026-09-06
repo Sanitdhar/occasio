@@ -1,6 +1,7 @@
 import { userId } from '@occasio/core';
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { isAuthProvider } from '../auth';
+import { isValidationError } from '../errors';
 import { createMockAuthAdapter } from './authAdapter';
 import { createMemoryStorage } from './storage';
 import type { AuthEvent, AuthSession } from '../auth';
@@ -17,6 +18,22 @@ import type { MockStorage } from './storage';
 const USER = { id: userId('u_sanit'), email: 'sanit@example.com' };
 
 const adapterOn = (storage: MockStorage) => createMockAuthAdapter({ user: USER, storage });
+
+/**
+ * The same store, answering out of order.
+ *
+ * Writes are made slower than removes, so an unqueued sign-in and sign-out started together land
+ * backwards — which is exactly the interleaving the queue exists to prevent and which a store
+ * that answers instantly can never produce.
+ */
+const slowStorage = (inner: MockStorage): MockStorage => ({
+  read: (k) => inner.read(k),
+  write: async (k, v) => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await inner.write(k, v);
+  },
+  remove: (k) => inner.remove(k),
+});
 
 /** Records what a listener heard, so ordering and duplication are both visible. */
 const recorder = () => {
@@ -164,6 +181,44 @@ describe('the mock auth adapter', () => {
     });
   });
 
+  describe('overlapping transitions', () => {
+    it('does not let a slow sign-in undo a sign-out', async () => {
+      /*
+       * Both are read-write across an await, so without a queue the writes land in whichever
+       * order storage finishes them: a sign-in whose write settles after a sign-out's remove
+       * puts the session back on disk, and the next reload signs the person in again — from the
+       * action they took to leave.
+       *
+       * Nothing on screen disagrees while it happens, which is what makes it worth a test: the
+       * in-memory session says signed out, and the late `SIGNED_IN` carries that same null.
+       */
+      const storage = slowStorage(createMemoryStorage());
+      const auth = adapterOn(storage);
+
+      const signingIn = auth.signInWithOAuth('google');
+      const signingOut = auth.signOut();
+      await Promise.all([signingIn, signingOut]);
+
+      expect(await auth.getSession()).toBeNull();
+      /* The disk, not just the field — a reload is what would reveal a stale write. */
+      expect(await adapterOn(storage).getSession()).toBeNull();
+    });
+
+    it('ends signed in when signing out is what finished first', async () => {
+      /* The mirror image, so the queue is shown to preserve order rather than to favour one
+         outcome. */
+      const storage = slowStorage(createMemoryStorage());
+      const auth = adapterOn(storage);
+
+      const signingOut = auth.signOut();
+      const signingIn = auth.signInWithOAuth('google');
+      await Promise.all([signingOut, signingIn]);
+
+      expect(await auth.getSession()).not.toBeNull();
+      expect(await adapterOn(storage).getSession()).not.toBeNull();
+    });
+  });
+
   describe('what it refuses to believe', () => {
     it('recognises only the providers D28 allows', () => {
       /*
@@ -180,8 +235,31 @@ describe('the mock auth adapter', () => {
     });
 
     it('signs nobody in when the provider is refused', async () => {
-      /* The predicate is the rule; this is the adapter honouring it. */
+      /*
+       * The first version of this called `'google'` and asserted the session existed — a test
+       * whose name described a refusal and whose body exercised the happy path, which is worse
+       * than no test. It could not fail if unsupported providers were accepted.
+       *
+       * `Reflect.apply` is how to reach the case without a cast: its parameters are untyped, so
+       * this is genuinely the untyped caller the guard exists for, rather than a lie told to the
+       * compiler.
+       */
       const auth = adapterOn(createMemoryStorage());
+
+      let caught: unknown;
+      try {
+        await Reflect.apply(auth.signInWithOAuth, auth, ['facebook']);
+      } catch (error) {
+        caught = error;
+      }
+
+      /* The guard recognised through the exported type guard, which is how a caller narrows one
+         of these — and asserted to have thrown at all, so a call that quietly resolved could not
+         pass by leaving `caught` undefined. */
+      expect(isValidationError(caught)).toBe(true);
+      expect(await auth.getSession()).toBeNull();
+
+      /* …and the real provider still works, so the guard is not simply refusing everything. */
       await auth.signInWithOAuth('google');
       expect(await auth.getSession()).not.toBeNull();
     });
@@ -198,6 +276,24 @@ describe('the mock auth adapter', () => {
         await storage.write('occasio.auth.session', stored);
         expect([stored, await adapterOn(storage).getSession()]).toEqual([stored, null]);
       }
+    });
+
+    it('does not let a configured role travel into the session', async () => {
+      /*
+       * The same rule on the way *in*, which is where it is needed first. `MockAuthOptions`'s
+       * user is a structural type, so an object carrying a role satisfies it — and a spread
+       * would have put that role into the live session and then persisted it. Sanitising only on
+       * read would leave the running app holding it until a reload.
+       */
+      /* Through a variable, because an object literal would be refused by the excess-property
+         check — and a variable is how such an object actually arrives: something builds a user
+         with more on it than this adapter asked for, and structural typing accepts it. */
+      const configured = { ...USER, role: 'owner' };
+      const auth = createMockAuthAdapter({ user: configured, storage: createMemoryStorage() });
+      await auth.signInWithOAuth('google');
+
+      const session = await auth.getSession();
+      expect(Object.keys(session?.user ?? {}).sort()).toEqual(['email', 'id']);
     });
 
     it('does not let a stored role travel into the session', async () => {

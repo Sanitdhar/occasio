@@ -73,6 +73,28 @@ export const createMockAuthAdapter = (options: MockAuthOptions): AuthAdapter => 
   let restored: Promise<void> | null = null;
   const listeners = new Set<AuthListener>();
 
+  /*
+   * One transition at a time.
+   *
+   * Signing in and signing out are each read-write across an await, so overlapping them lets the
+   * writes land out of order: a sign-in whose `storage.write` settles after a sign-out's
+   * `storage.remove` restores the session on disk, and the next reload signs the person back in
+   * — from the action they took to leave. Worse, nothing on screen disagrees: the in-memory
+   * session says signed out, and the late `SIGNED_IN` event carries that same null session, so
+   * the only symptom is a reload much later.
+   *
+   * A queue rather than a generation check, because the order of the writes is what has to be
+   * right — discarding a stale write still leaves two of them racing for the disk.
+   */
+  let chain: Promise<unknown> = Promise.resolve();
+
+  const serialise = <T>(task: () => Promise<T>): Promise<T> => {
+    const next = chain.then(task, task);
+    /* A failing transition must not poison the queue, while its caller still sees the failure. */
+    chain = next.catch(() => undefined);
+    return next;
+  };
+
   /* Read once and shared, so several callers during start-up do not each hit storage — and so
      `getSession` and a listener registered in the same tick cannot disagree about the answer. */
   const restore = (): Promise<void> => {
@@ -119,26 +141,32 @@ export const createMockAuthAdapter = (options: MockAuthOptions): AuthAdapter => 
       };
     },
 
-    signInWithOAuth: async (provider: AuthProvider) => {
-      /* Unreachable from TypeScript and reachable from a JavaScript caller or a stale bundle.
-         An unknown provider must not quietly sign somebody in as the demo account. */
-      if (!isAuthProvider(provider)) {
-        throw new ValidationError([
-          { path: 'provider', message: `unsupported: ${String(provider)}` },
-        ]);
-      }
+    signInWithOAuth: (provider: AuthProvider) =>
+      serialise(async () => {
+        /* Unreachable from TypeScript and reachable from a JavaScript caller or a stale
+           bundle. An unknown provider must not quietly sign somebody in as the demo account. */
+        if (!isAuthProvider(provider)) {
+          throw new ValidationError([
+            { path: 'provider', message: `unsupported: ${String(provider)}` },
+          ]);
+        }
 
-      await restore();
-      session = { user: { ...options.user }, expiresAt: null };
-      await storage.write(key, JSON.stringify(session));
-      emit('SIGNED_IN', [...listeners]);
-    },
+        await restore();
+        /* Field by field, not a spread. `MockAuthOptions['user']` is structural, so an object
+           carrying `role: 'owner'` satisfies it — and a spread would put that role into the live
+           session and persist it. The parse on the way back out sanitises a *stored* session;
+           this is the same rule applied on the way in, where it is needed first. */
+        session = { user: { id: options.user.id, email: options.user.email }, expiresAt: null };
+        await storage.write(key, JSON.stringify(session));
+        emit('SIGNED_IN', [...listeners]);
+      }),
 
-    signOut: async () => {
-      await restore();
-      session = null;
-      await storage.remove(key);
-      emit('SIGNED_OUT', [...listeners]);
-    },
+    signOut: () =>
+      serialise(async () => {
+        await restore();
+        session = null;
+        await storage.remove(key);
+        emit('SIGNED_OUT', [...listeners]);
+      }),
   };
 };
