@@ -1,7 +1,8 @@
 import { isNotFoundError } from '@occasio/data';
 import { Button, EmptyState, Screen, Skeleton, SkeletonGroup } from '@occasio/ui';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTenantBySlug } from '../data/hooks';
+import { rememberTenant } from './recentTenants';
 import { useTenantResolution } from './TenantProvider';
 import { useDeferredFlag } from './useDeferredFlag';
 
@@ -41,6 +42,18 @@ export function TenantGate({ onLeave, leaveLabel, children }: Props) {
   const tenant = useTenantBySlug(slug);
   const pending = resolution.kind === 'resolving' || (slug !== null && tenant.isPending);
   const showSpinner = useDeferredFlag(pending, SPINNER_DELAY_MS);
+
+  const opened = tenant.data;
+  useEffect(() => {
+    /*
+     * Remembered here rather than where the slug is resolved, and only once the event has
+     * actually loaded. A slug that resolves is not yet an event somebody reached — it may not
+     * exist — so remembering earlier would fill the picker with mistyped addresses. This is also
+     * the only place the name is known, which is what lets the picker render a list of events
+     * rather than a list of slugs.
+     */
+    if (opened !== undefined) void rememberTenant({ slug: opened.slug, name: opened.name });
+  }, [opened]);
 
   if (pending) {
     /*
