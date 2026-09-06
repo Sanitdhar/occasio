@@ -28,7 +28,8 @@ const modulePathIgnorePatterns = ['<rootDir>/.claude/'];
  * the files do not import React, because with the automatic runtime they do not have to.
  */
 const transform = {
-  '^.+\\.(t|j)sx?$': [
+  /* `.mjs` included: the tools are written as ES modules and are tested like anything else. */
+  '^.+\\.(m?[tj]s|[tj]sx)$': [
     '@swc/jest',
     {
       jsc: {
@@ -50,6 +51,9 @@ export default {
         '<rootDir>/packages/*/src/**/*.test.tsx',
         // App-level logic is testable too — navigation ordering is pure and had a real bug.
         '<rootDir>/apps/*/src/**/*.test.ts',
+        /* The tools decide what merges and what lints. They are not support scripts to this
+           repo, they are part of it, and the ones with real logic are tested like it. */
+        '<rootDir>/tools/**/*.test.ts',
       ],
       testPathIgnorePatterns: ['\\.contract\\.test\\.', '\\.dom\\.test\\.'],
       moduleNameMapper,
