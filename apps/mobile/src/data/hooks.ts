@@ -8,7 +8,8 @@ import type {
 } from '@occasio/data';
 import type { GossipPostId, TenantId } from '@occasio/core';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import type { Page, Session, Venue, GossipPost, Announcement } from '@occasio/data';
+import { isNotFoundError } from '@occasio/data';
+import type { Page, Session, Tenant, Venue, GossipPost, Announcement } from '@occasio/data';
 import { useAdapter } from './AdapterProvider';
 import { queryKeys } from './queryKeys';
 
@@ -24,6 +25,31 @@ import { queryKeys } from './queryKeys';
  * an ambient fact, and the moment it becomes ambient is the moment two open events start
  * borrowing each other's data.
  */
+
+/**
+ * The event behind a slug — the one lookup that happens before there is a tenant to scope to.
+ *
+ * Retries are deliberately narrowed. The root layout asks for two, which is right for a phone on
+ * venue wifi and wrong here: a mistyped slug is the first thing anyone will hit, and a
+ * `NotFoundError` is a settled answer rather than a bad connection. Retrying it means three
+ * round trips of a spinner before somebody is told the address is wrong.
+ */
+export const useTenantBySlug = (slug: string | null): UseQueryResult<Tenant> => {
+  const adapter = useAdapter();
+  return useQuery({
+    queryKey: queryKeys.directory.bySlug(slug ?? ''),
+    queryFn: () => adapter.directory.bySlug(slug ?? ''),
+    /* `null` is "no slug yet", which is a state and not a lookup. Without this the gate would
+       ask the directory for the empty string every time resolution had not finished — a request
+       whose only possible answer is an error, cached under a key nothing will ever want. */
+    enabled: slug !== null && slug !== '',
+    retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
+    /* A tenant's name and theme do not change while somebody is looking at the page, and this
+       result gates every screen under /e/[slug] — so it is kept long enough that moving between
+       events and back does not put a loading state in front of a page that is already known. */
+    staleTime: 5 * 60_000,
+  });
+};
 
 export const useSessions = (
   tenantId: TenantId,
