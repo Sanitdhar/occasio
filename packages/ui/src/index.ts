@@ -80,3 +80,16 @@ export {
 } from './primitives/tones';
 
 export const UI_PACKAGE_VERSION = '0.0.0' as const;
+
+/* Layout (#30). Breakpoints come from `useWindowDimensions` and the theme, because React Native
+   has no media queries — see layout/breakpoints.ts for why the comparison is mobile-first. */
+export { Screen } from './layout/Screen';
+export { Split } from './layout/Split';
+export { useBreakpoint } from './layout/useBreakpoint';
+export {
+  BREAKPOINT_NAMES,
+  atLeast,
+  breakpointFor,
+  type Breakpoint,
+  type BreakpointName,
+} from './layout/breakpoints';
