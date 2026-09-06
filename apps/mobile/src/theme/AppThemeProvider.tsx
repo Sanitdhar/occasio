@@ -2,6 +2,7 @@ import type { Scheme, ThemeInput } from '@occasio/theme';
 import { ThemeProvider } from '@occasio/ui';
 import type { ReactNode } from 'react';
 import { useDeviceScheme } from './useDeviceScheme';
+import { useReducedMotion } from './useReducedMotion';
 import { useFontReadyInput } from './useTypeSetFonts';
 
 type Props = {
@@ -12,8 +13,9 @@ type Props = {
 };
 
 /**
- * The app's own binding of `<ThemeProvider>`: it reads the device scheme and starts the theme's
- * fonts loading (#31), so neither is something a route layout has to remember.
+ * The app's own binding of `<ThemeProvider>`: it reads the device scheme and the reduce-motion
+ * preference, and starts the theme's fonts loading (#31), so none of the three is something a
+ * route layout has to remember.
  *
  * `ThemeProvider` itself stays free of React Native and of font loading on purpose — it has to
  * render in a plain React test and, later, in server-rendered web output. These two concerns
@@ -23,10 +25,16 @@ type Props = {
  */
 export function AppThemeProvider({ input, forceScheme, children }: Props) {
   const systemScheme = useDeviceScheme();
+  const reducedMotion = useReducedMotion();
   const fontReady = useFontReadyInput(input);
 
   return (
-    <ThemeProvider input={fontReady} systemScheme={systemScheme} forceScheme={forceScheme}>
+    <ThemeProvider
+      input={fontReady}
+      systemScheme={systemScheme}
+      forceScheme={forceScheme}
+      reducedMotion={reducedMotion}
+    >
       {children}
     </ThemeProvider>
   );
