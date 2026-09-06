@@ -76,6 +76,43 @@ open PR ──▶ CI (4 gates) ──▶ CodeRabbit review ──▶ triage ever
 Do not merge with findings left unanswered. A stale review thread is indistinguishable from one
 nobody read, and six months later nobody can tell which it was.
 
+### Check the review actually happened
+
+**`CodeRabbit: success` does not mean the PR was reviewed.** When the organisation's hourly
+review budget is exhausted, CodeRabbit posts a "Review limit reached" comment and sets the
+status to:
+
+```
+CodeRabbit: success | Review rate limited
+```
+
+A merge gate keyed on `success` therefore passes on a PR nothing has read. Three PRs — #121,
+#122, #123 — merged that way, reviewed by nothing but CI, because parallel work outran the
+budget and the status looked identical to a real pass.
+
+Before merging, run:
+
+```bash
+npm run check:reviewed -- <pr-number>
+```
+
+It looks for evidence of an actual review — a walkthrough, a finding, or a submitted review —
+and exits non-zero if there is none.
+
+### Parallel work is capped by the review budget, not by machines
+
+CodeRabbit's capacity is a rolling, plan-dependent quota — not a number worth hardcoding here,
+and the message it posts when exhausted ("you've used all N included reviews currently
+available") reflects the plan at that moment. Check the
+[review capacity dashboard](https://app.coderabbit.ai/dashboard/review-capacity) for the current
+figure.
+
+What matters is the shape rather than the number: **every push to every open PR spends from the
+same pool**, and when it runs dry reviews degrade into rate-limit passes rather than queueing.
+Running many PRs at once therefore does not raise throughput past that point — it converts
+reviews into unreviewed merges. Throughput here is limited by review capacity, not by how much
+can be written at once.
+
 **Verify before you accept.** A reviewer can be right for the wrong reason, or wrong in a way
 that looks right. On #95 the Metro finding was correct, but checking it showed the real problem
 was worse than described — the override was not merely redundant, it made Metro watch the whole
