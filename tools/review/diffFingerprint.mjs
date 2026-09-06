@@ -19,6 +19,40 @@
 export const COMPARE_FILE_CAP = 300;
 
 /**
+ * The lines a patch adds and removes, without the context around them.
+ *
+ * A rebase does not change an edit, but it does change where the edit sits: replay a branch onto
+ * a main that has moved and the same three added lines arrive with different surrounding
+ * context and different hunk headers. Comparing the raw patch then reports a change that a
+ * reviewer would not see, and the pull request is stuck asking for a review of nothing — which
+ * is where #144 spent an afternoon and eight rebases.
+ *
+ * What this gives up is the ability to notice the same edit applied somewhere else in the same
+ * file. That is a real gap and a narrow one: it needs identical added and removed lines at a
+ * different location, with no other file differing. The alternative is a gate that a rebase
+ * defeats, which is worse, because the answer to it is a human deciding to merge anyway.
+ *
+ * @param {string} patch
+ * @returns {string}
+ */
+const changedLines = (patch) => {
+  /*
+   * File headers are recognised by position, not by prefix.
+   *
+   * `+++` and `---` introduce the two filenames, and they appear only before the first hunk.
+   * Filtering on the prefix instead also discarded a line adding `++counter;` — encoded as
+   * `+++counter;` — and one removing `--counter;`. Dropping a changed line is the fail-open
+   * direction: two different patches fingerprint the same, and the gate reports a review that
+   * never happened.
+   */
+  const lines = patch.split('\n');
+  const firstHunk = lines.findIndex((line) => line.startsWith('@@'));
+  const body = firstHunk === -1 ? lines : lines.slice(firstHunk);
+
+  return body.filter((line) => line.startsWith('+') || line.startsWith('-')).join('\n');
+};
+
+/**
  * Whether a file carries enough to tell one version of it from another.
  *
  * A file with neither a patch nor a blob sha serialises to `binary:unknown`, and so does every
@@ -59,7 +93,12 @@ export const diffEntries = (files) =>
        * version from another. Falling back to the empty string instead would make every binary
        * change invisible here — two different images would fingerprint identically.
        */
-      const body = file.patch ?? `binary:${file.sha ?? 'unknown'}`;
+      const body =
+        /* Nullish: `patch` arrives as `null` for a binary file as readily as absent, and
+           splitting null would throw inside the comparison rather than answer it. */
+        (file.patch ?? null) === null
+          ? `binary:${file.sha ?? 'unknown'}`
+          : changedLines(String(file.patch));
       /* The status matters on its own: deleting a file and adding it back with the same
          contents is not the same change as leaving it alone. */
       return `${name}\n${from}\n${file.status ?? 'unknown'}\n${body}`;

@@ -33,6 +33,75 @@ describe('diffFingerprint', () => {
     expect(diffFingerprint([a, b])).toBe(diffFingerprint([b, a]));
   });
 
+  it('ignores the context a rebase moves an edit into', () => {
+    /*
+     * The same edit replayed onto a moved base arrives with different surrounding context and a
+     * different hunk header. Comparing the raw patch reported a change no reviewer would see,
+     * and left the pull request asking for a review of nothing — eight rebases on #144.
+     */
+    const before = file({
+      patch: '@@ -1,3 +1,4 @@\n const a = 1;\n+const added = 2;\n const b = 3;',
+    });
+    const rebased = file({
+      patch: '@@ -40,3 +40,4 @@\n const x = 9;\n+const added = 2;\n const y = 10;',
+    });
+
+    expect(diffFingerprint([before])).toBe(diffFingerprint([rebased]));
+  });
+
+  it('keeps a changed line that begins with a plus or a minus', () => {
+    /*
+     * `++counter;` added is encoded `+++counter;`, and `--counter;` removed is `---counter;`.
+     * A filter that recognised file headers by prefix dropped both — and dropping a changed
+     * line is the fail-open direction: two different patches fingerprint the same, and the gate
+     * reports a review that never happened.
+     */
+    const added = file({ patch: '@@ -1,2 +1,3 @@\n const a = 1;\n+++counter;' });
+    const removed = file({ patch: '@@ -1,3 +1,2 @@\n const a = 1;\n---counter;' });
+
+    /* Each encoding checked on its own, because comparing the two to each other passes for a
+       regression that drops one of them -- which is what the first version of this test did:
+       both its fixtures were *added* lines, so nothing exercised `---`. */
+    expect(diffFingerprint([added])).toContain('++counter;');
+    expect(diffFingerprint([removed])).toContain('--counter;');
+    expect(diffFingerprint([added])).not.toBe(diffFingerprint([removed]));
+  });
+
+  it('still drops the filename headers themselves', () => {
+    /* They precede the first hunk, which is how they are told apart now. Keeping them would
+       make a rename look like a content change. */
+    const withHeaders = file({
+      patch: '--- a/src/x.ts\n+++ b/src/x.ts\n@@ -1 +1 @@\n-old\n+new',
+    });
+    const withoutHeaders = file({ patch: '@@ -1 +1 @@\n-old\n+new' });
+
+    expect(diffFingerprint([withHeaders])).toBe(diffFingerprint([withoutHeaders]));
+  });
+
+  it('does not throw on a null patch', () => {
+    /* `patch` arrives as `null` for a binary file as readily as absent, and splitting null
+       would throw inside the comparison rather than answer it. */
+    const binary = { filename: 'assets/hero.png', status: 'modified', patch: null, sha: 'abc' };
+
+    expect(() => diffFingerprint([binary])).not.toThrow();
+    expect(diffFingerprint([binary])).toContain('binary:abc');
+  });
+
+  it('still notices a different line arriving in the same place', () => {
+    /* The property the rule above must not cost: what was added is still compared. */
+    const added = file({ patch: '@@ -1,3 +1,4 @@\n const a = 1;\n+const added = 2;' });
+    const other = file({ patch: '@@ -1,3 +1,4 @@\n const a = 1;\n+const different = 2;' });
+
+    expect(diffFingerprint([added])).not.toBe(diffFingerprint([other]));
+  });
+
+  it('notices a removal that the added lines alone would hide', () => {
+    const removes = file({ patch: '@@ -1,3 +1,2 @@\n const a = 1;\n-const gone = 2;' });
+    const keeps = file({ patch: '@@ -1,3 +1,3 @@\n const a = 1;\n const gone = 2;' });
+
+    expect(diffFingerprint([removes])).not.toBe(diffFingerprint([keeps]));
+  });
+
   it('changes when a single line of a patch changes', () => {
     expect(diffFingerprint([file()])).not.toBe(
       diffFingerprint([file({ patch: '@@ -1 +1 @@\n-old\n+newer' })]),
