@@ -182,10 +182,26 @@ describe('the fixture set', () => {
     /* An id collision across tenants is how one event's content appears inside another, and it
        is invisible until it happens on a screen. Memberships are included because their ids
        used to be derived from `user_id`, and an unaccepted invitation has none. */
+    /*
+     * Built from the rows, not from the maps. A `Map` keyed by id collapses a duplicate before
+     * this can see it, so counting its keys would have compared a deduplicated list against its
+     * own length and passed on exactly the input it exists to reject. The maps are for foreign
+     * key lookup, where one entry per id is what is wanted.
+     */
     const ids = [
-      ...ALL_SCOPED.flatMap((table) => [...table.keys()]),
-      ...seed.memberships.map((m) => String(m.id)),
-    ];
+      ...seed.venues,
+      ...seed.sessions,
+      ...seed.people,
+      ...seed.mediaAssets,
+      ...seed.personas,
+      ...seed.units,
+      ...seed.tasks,
+      ...seed.gossipPosts,
+      ...seed.memberships,
+      ...seed.assignments,
+      ...seed.announcements,
+      ...seed.approvalRequests,
+    ].map((row) => String(row.id));
 
     expect(new Set(ids).size).toBe(ids.length);
   });
