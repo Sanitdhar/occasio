@@ -26,6 +26,25 @@ behaviour of the app.** There is no per-event code. A new event is a new row.
 One TypeScript codebase renders iOS, Android and web from a single Expo tree. Web ships first —
 free to host, no store review, and a link that works the moment you send it.
 
+## Access control in the prototype
+
+Roles gate what the app **offers**, not what it **allows**.
+
+`RoleGate` and `useRole` decide which screens somebody is shown, and they run on a device that
+person controls — the bundle can be edited and the check deleted, and the request that follows is
+made by their machine either way. What actually stops a guest reading a moderation queue is
+row-level security in the database, which is why every repository method takes a tenant as its
+first argument and why the RLS policies are the thing to review when the Supabase adapter lands.
+
+Two consequences worth stating plainly while this is a prototype:
+
+- **The gates are honest UX and nothing more.** They exist so people are not shown doors that
+  will not open. Treating them as security would be a mistake, and there is no enforcement layer
+  behind them yet.
+- **A session carries no authority.** Roles are read from the data layer per event, never from a
+  token — so revoking somebody's access takes effect on their next read rather than on their
+  next sign-in. `AuthUser` has an id and an email and deliberately nothing else.
+
 ## Reviewing
 
 Every PR is reviewed by [CodeRabbit](https://coderabbit.ai), configured in

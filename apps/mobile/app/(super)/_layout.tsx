@@ -1,5 +1,6 @@
 import { useTheme } from '@occasio/ui';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
+import { PlatformGate } from '../../src/access/PlatformGate';
 import { AppThemeProvider } from '../../src/theme/AppThemeProvider';
 import { APP_THEME } from '../../src/theme/inputs';
 
@@ -23,7 +24,16 @@ function Chrome() {
 export default function AdminLayout() {
   return (
     <AppThemeProvider input={APP_THEME}>
-      <Chrome />
+      {/* Not a `RoleGate`: memberships are per event and this area is not. See PlatformGate for
+          the gap that leaves and why it is an allow-list rather than a schema field. */}
+      <PlatformGate
+        leaveLabel="Back to your events"
+        onLeave={() => {
+          router.replace('/discover');
+        }}
+      >
+        <Chrome />
+      </PlatformGate>
     </AppThemeProvider>
   );
 }
