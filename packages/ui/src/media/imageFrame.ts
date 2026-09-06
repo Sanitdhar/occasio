@@ -29,29 +29,67 @@ export type ImageAccessibility = {
 };
 
 /**
- * `undefined` means the image was explicitly declared decorative, not that somebody forgot —
- * the component's prop types make the two impossible to confuse.
+ * Complains in development and stays silent in a shipped build.
+ *
+ * An unlabelled photograph is a defect, but it is not one worth blanking a hero image over, so
+ * this is a warning rather than a throw. Metro replaces `process.env.NODE_ENV` at build time,
+ * so the branch is eliminated from the production bundle entirely.
+ */
+const warnInDevelopment = (message: string): void => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn(`<Image>: ${message}`);
+  }
+};
+
+/**
+ * The description a screen reader will read, or the decision to say nothing.
  *
  * A decorative image is hidden outright rather than announced with an empty label: on web
  * `alt=""` already removes it from the accessibility tree, and on native the two hiding props
  * are what iOS and Android respectively read. Announcing "image" with no description is worse
  * than silence, because the listener has to stop and work out that nothing was said.
+ *
+ * Both arguments are needed to tell "nothing to describe" apart from "nobody wrote one", and
+ * the difference matters: the first is a deliberate choice and the second is a bug that hides a
+ * photograph from a reader who has no other way to know it is there. The prop types already
+ * make the second impossible in TypeScript, but the types are not what runs — a JavaScript
+ * caller, a `JSON.parse`d prop bag or a stale build all reach this function with neither. So
+ * does `alt=""`, which is how an empty caption field arrives, and which the type system cannot
+ * catch at all.
  */
-export const imageAccessibility = (alt: string | undefined): ImageAccessibility =>
-  alt === undefined
-    ? {
-        accessible: false,
-        accessibilityLabel: '',
-        accessibilityElementsHidden: true,
-        importantForAccessibility: 'no-hide-descendants',
-      }
-    : {
-        accessible: true,
-        accessibilityRole: 'image',
-        accessibilityLabel: alt,
-        accessibilityElementsHidden: false,
-        importantForAccessibility: 'yes',
-      };
+export const imageAccessibility = (
+  alt: string | undefined,
+  decorative: boolean,
+): ImageAccessibility => {
+  if (alt !== undefined && alt !== '') {
+    /* Both were given. Describing the image is the safer of the two, so the label wins and the
+       contradiction is reported rather than resolved silently. */
+    if (decorative) warnInDevelopment('both `alt` and `decorative` were given; using `alt`.');
+
+    return {
+      accessible: true,
+      accessibilityRole: 'image',
+      accessibilityLabel: alt,
+      accessibilityElementsHidden: false,
+      importantForAccessibility: 'yes',
+    };
+  }
+
+  if (!decorative) {
+    warnInDevelopment(
+      alt === ''
+        ? '`alt` is an empty string, so this image is invisible to a screen reader. Describe it, or pass `decorative` if there is nothing to describe.'
+        : 'neither `alt` nor `decorative` was given. Describe the image, or pass `decorative` if there is nothing to describe.',
+    );
+  }
+
+  return {
+    accessible: false,
+    accessibilityLabel: '',
+    accessibilityElementsHidden: true,
+    importantForAccessibility: 'no-hide-descendants',
+  };
+};
 
 /* -------------------------------------------------------------------------------------------
  * Overlay

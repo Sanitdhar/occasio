@@ -69,11 +69,13 @@ type ImageFrameProps = {
   /**
    * Margins, width, position — the frame's place in its parent.
    *
-   * `aspectRatio` is deliberately not assignable: the ratio is the token's decision, and an
-   * escape hatch that can quietly reintroduce a mixed set of ratios is not an escape hatch, it
-   * is the rule with an opt-out. Use `aspect` to choose between the ratios the system has.
+   * `aspectRatio`, `borderRadius` and `overflow` are not assignable, and are applied after this
+   * style so that a value smuggled past the type through a variable still loses. The ratio and
+   * the crop are the token's decision; use `aspect` and `radius` to choose between the values
+   * the system has.
    */
-  readonly style?: StyleProp<Omit<ViewStyle, 'aspectRatio'>> | undefined;
+  readonly style?:
+    StyleProp<Omit<ViewStyle, 'aspectRatio' | 'borderRadius' | 'overflow'>> | undefined;
 };
 
 /**
@@ -106,16 +108,19 @@ export type ImageProps = ImageFrameProps & ImageAltProps;
 const FILL = { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 } as const;
 
 const useStyles = createStyles((t) => ({
-  /* The frame owns the ratio and the clip; the photograph only fills it. `overflow: hidden` is
-     what turns the radius and the crop into one thing rather than two. */
+  /* Defaults, applied BEFORE the caller's style so both can be overridden: a thumbnail in a
+     row may want its own width, and a frame over a photographic background may want no fill. */
   frame: {
     width: '100%',
-    overflow: 'hidden',
     /* Ramp step 4 is a component background — visible against both `bg` and `surface` in either
        scheme. It shows for the moment before a blurhash decodes, and for the whole life of an
        image that has none. Never a spinner. */
     backgroundColor: t.color.ramp.neutral[3],
   },
+  /* `overflow: hidden` is not a default. It is what makes the ratio a crop rather than a
+     suggestion, and what clips the corners — so it goes after the caller's style, with the
+     aspect and the radius. */
+  crop: { overflow: 'hidden' },
   aspectHero: { aspectRatio: t.image.heroAspect },
   aspectSquare: { aspectRatio: 1 },
   radiusHero: { borderRadius: t.image.radius },
@@ -134,10 +139,11 @@ const useStyles = createStyles((t) => ({
 export function Image({
   source,
   blurhash,
-  /* `decorative` is a type-level marker and nothing else — it exists so that omitting `alt`
-     has to be written down. At runtime the absence of `alt` is the whole signal, which is why
-     it is not destructured here. */
   alt,
+  /* Read at runtime, not only at the type level. `imageAccessibility` has to tell a deliberate
+     "there is nothing to describe" apart from a forgotten `alt`, and `decorative` is the only
+     thing that carries the difference once the types are gone. */
+  decorative = false,
   aspect = 'hero',
   radius = 'hero',
   scrim,
@@ -157,11 +163,15 @@ export function Image({
 
   return (
     <View
+      /* Order is the enforcement. The caller's style sits between the defaults it may
+         override and the three properties it may not: an escape hatch that can put back a
+         second aspect ratio is the rule with an opt-out, not an escape hatch. */
       style={[
         styles.frame,
+        style,
+        styles.crop,
         aspect === 'hero' ? styles.aspectHero : styles.aspectSquare,
         radius === 'hero' ? styles.radiusHero : styles.radiusNone,
-        style,
       ]}
     >
       <ExpoImage
@@ -179,7 +189,7 @@ export function Image({
         priority={priority ?? null}
         recyclingKey={recyclingKey ?? null}
         style={styles.image}
-        {...imageAccessibility(alt)}
+        {...imageAccessibility(alt, decorative)}
       />
       {geometry === null ? null : (
         <LinearGradient

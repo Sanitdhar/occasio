@@ -1,19 +1,33 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { hasOverlay, imageAccessibility, scrimGeometry } from './imageFrame';
 
 describe('imageAccessibility', () => {
+  /* The warnings are the point of half these cases, so they are captured rather than printed:
+     an assertion that a defect was reported is what stops the reporting from being dropped in
+     a later refactor, and a silent test run is worth having on its own. */
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+  beforeEach(() => {
+    warn.mockClear();
+  });
+
+  afterAll(() => {
+    warn.mockRestore();
+  });
+
   it('announces an image that has alternative text', () => {
-    expect(imageAccessibility('The couple cutting the cake')).toEqual({
+    expect(imageAccessibility('The couple cutting the cake', false)).toEqual({
       accessible: true,
       accessibilityRole: 'image',
       accessibilityLabel: 'The couple cutting the cake',
       accessibilityElementsHidden: false,
       importantForAccessibility: 'yes',
     });
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('hides a decorative image rather than announcing an empty one', () => {
-    const props = imageAccessibility(undefined);
+    const props = imageAccessibility(undefined, true);
 
     /* Empty rather than absent: expo-image maps accessibilityLabel to the web `alt` attribute,
        and `alt=""` is what removes an image from the accessibility tree. A missing attribute
@@ -23,6 +37,44 @@ describe('imageAccessibility', () => {
     expect(props.accessibilityElementsHidden).toBe(true);
     expect(props.importantForAccessibility).toBe('no-hide-descendants');
     expect(props.accessibilityRole).toBeUndefined();
+
+    /* Declaring an image decorative is a decision, not a mistake, so it is the one hiding path
+       that must stay quiet. A warning here would train people to ignore the others. */
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('reports an empty `alt` instead of silently hiding the photograph', () => {
+    /* How an empty caption field arrives: `alt={caption}` where the admin left it blank. The
+       types cannot catch it — `''` is a string — and the result is a photograph that a screen
+       reader never mentions, which is indistinguishable from the image not being there. */
+    const props = imageAccessibility('', false);
+
+    expect(props.accessible).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain('empty string');
+  });
+
+  it('reports an image that was given neither `alt` nor `decorative`', () => {
+    /* Unreachable from TypeScript and entirely reachable from a JavaScript caller or a prop bag
+       that came out of `JSON.parse`. The image is still hidden — that is the safe default for a
+       frame that is about to render — but it is hidden loudly. */
+    const props = imageAccessibility(undefined, false);
+
+    expect(props.accessible).toBe(false);
+    expect(props.accessibilityElementsHidden).toBe(true);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain('neither');
+  });
+
+  it('describes the image when it is given both, and says so', () => {
+    /* A contradiction resolved toward the reader who cannot see the picture. Silently honouring
+       `decorative` would drop a description someone actually wrote. */
+    const props = imageAccessibility('The ceremony arch', true);
+
+    expect(props.accessibilityLabel).toBe('The ceremony arch');
+    expect(props.accessible).toBe(true);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain('both');
   });
 });
 
