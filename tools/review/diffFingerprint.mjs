@@ -19,6 +19,29 @@
 export const COMPARE_FILE_CAP = 300;
 
 /**
+ * The lines a patch adds and removes, without the context around them.
+ *
+ * A rebase does not change an edit, but it does change where the edit sits: replay a branch onto
+ * a main that has moved and the same three added lines arrive with different surrounding
+ * context and different hunk headers. Comparing the raw patch then reports a change that a
+ * reviewer would not see, and the pull request is stuck asking for a review of nothing — which
+ * is where #144 spent an afternoon and eight rebases.
+ *
+ * What this gives up is the ability to notice the same edit applied somewhere else in the same
+ * file. That is a real gap and a narrow one: it needs identical added and removed lines at a
+ * different location, with no other file differing. The alternative is a gate that a rebase
+ * defeats, which is worse, because the answer to it is a human deciding to merge anyway.
+ *
+ * @param {string} patch
+ * @returns {string}
+ */
+const changedLines = (patch) =>
+  patch
+    .split('\n')
+    .filter((line) => /^[+-]/.test(line) && !/^(\+\+\+|---)/.test(line))
+    .join('\n');
+
+/**
  * Whether a file carries enough to tell one version of it from another.
  *
  * A file with neither a patch nor a blob sha serialises to `binary:unknown`, and so does every
@@ -59,7 +82,8 @@ export const diffEntries = (files) =>
        * version from another. Falling back to the empty string instead would make every binary
        * change invisible here — two different images would fingerprint identically.
        */
-      const body = file.patch ?? `binary:${file.sha ?? 'unknown'}`;
+      const body =
+        file.patch === undefined ? `binary:${file.sha ?? 'unknown'}` : changedLines(file.patch);
       /* The status matters on its own: deleting a file and adding it back with the same
          contents is not the same change as leaving it alone. */
       return `${name}\n${from}\n${file.status ?? 'unknown'}\n${body}`;

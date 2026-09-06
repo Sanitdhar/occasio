@@ -33,6 +33,37 @@ describe('diffFingerprint', () => {
     expect(diffFingerprint([a, b])).toBe(diffFingerprint([b, a]));
   });
 
+  it('ignores the context a rebase moves an edit into', () => {
+    /*
+     * The same edit replayed onto a moved base arrives with different surrounding context and a
+     * different hunk header. Comparing the raw patch reported a change no reviewer would see,
+     * and left the pull request asking for a review of nothing — eight rebases on #144.
+     */
+    const before = file({
+      patch: '@@ -1,3 +1,4 @@\n const a = 1;\n+const added = 2;\n const b = 3;',
+    });
+    const rebased = file({
+      patch: '@@ -40,3 +40,4 @@\n const x = 9;\n+const added = 2;\n const y = 10;',
+    });
+
+    expect(diffFingerprint([before])).toBe(diffFingerprint([rebased]));
+  });
+
+  it('still notices a different line arriving in the same place', () => {
+    /* The property the rule above must not cost: what was added is still compared. */
+    const added = file({ patch: '@@ -1,3 +1,4 @@\n const a = 1;\n+const added = 2;' });
+    const other = file({ patch: '@@ -1,3 +1,4 @@\n const a = 1;\n+const different = 2;' });
+
+    expect(diffFingerprint([added])).not.toBe(diffFingerprint([other]));
+  });
+
+  it('notices a removal that the added lines alone would hide', () => {
+    const removes = file({ patch: '@@ -1,3 +1,2 @@\n const a = 1;\n-const gone = 2;' });
+    const keeps = file({ patch: '@@ -1,3 +1,3 @@\n const a = 1;\n const gone = 2;' });
+
+    expect(diffFingerprint([removes])).not.toBe(diffFingerprint([keeps]));
+  });
+
   it('changes when a single line of a patch changes', () => {
     expect(diffFingerprint([file()])).not.toBe(
       diffFingerprint([file({ patch: '@@ -1 +1 @@\n-old\n+newer' })]),
