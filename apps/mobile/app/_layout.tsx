@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppAdapterProvider } from '../src/data/AppAdapterProvider';
 import { ErrorFallback } from '../src/features/errors/ErrorFallback';
 import { AppThemeProvider } from '../src/theme/AppThemeProvider';
 import { APP_THEME } from '../src/theme/inputs';
@@ -63,12 +64,14 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <AppThemeProvider input={APP_THEME}>
-          <SafeAreaProvider>
-            <StatusBar style="auto" />
-            <Stack screenOptions={{ headerShown: false }} />
-          </SafeAreaProvider>
-        </AppThemeProvider>
+        <AppAdapterProvider>
+          <AppThemeProvider input={APP_THEME}>
+            <SafeAreaProvider>
+              <StatusBar style="auto" />
+              <Stack screenOptions={{ headerShown: false }} />
+            </SafeAreaProvider>
+          </AppThemeProvider>
+        </AppAdapterProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
   );

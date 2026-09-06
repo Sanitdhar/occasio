@@ -76,7 +76,10 @@ export default {
       displayName: 'components',
       rootDir: '.',
       testEnvironment: 'jsdom',
-      testMatch: ['<rootDir>/packages/*/src/**/*.dom.test.tsx'],
+      testMatch: [
+        '<rootDir>/packages/*/src/**/*.dom.test.tsx',
+        '<rootDir>/apps/*/src/**/*.dom.test.tsx',
+      ],
       /*
        * `react-native` becomes its web build; the two Expo packages become stubs.
        *
