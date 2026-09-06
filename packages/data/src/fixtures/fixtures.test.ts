@@ -24,8 +24,11 @@ const seed = FIXTURE_SEED;
  * passed that check and renders as a session with no venue — the failure the check was written
  * to catch.
  */
-const byId = <T extends { readonly tenant_id: TenantId }>(
-  rows: readonly (T & { readonly id: { toString: () => string } })[],
+const byId = (
+  rows: readonly {
+    readonly id: { readonly toString: () => string };
+    readonly tenant_id: TenantId;
+  }[],
 ): ReadonlyMap<string, string> => new Map(rows.map((r) => [String(r.id), String(r.tenant_id)]));
 
 const venues = byId(seed.venues);
