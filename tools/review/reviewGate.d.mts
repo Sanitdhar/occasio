@@ -1,9 +1,11 @@
+import type { AutoReviewConfig, AutoReviewState } from './autoReview.d.mts';
+
 /** Types for the `.mjs` beside this file; see diffFingerprint.d.mts for why it stays `.mjs`. */
 
 export type ReviewVerdict = {
   title: string;
   baseRef: string | null;
-  autoReviewedBase: boolean | null;
+  autoReviewStatus: AutoReviewState;
   headSha: string | null;
   headAt: string | null;
   reviewerState: string;
@@ -31,5 +33,5 @@ export declare const evaluate: (options: {
   repo: string;
   pr: string | number;
   excludedPaths?: readonly string[];
-  baseBranches?: readonly string[] | null;
+  autoReview?: AutoReviewConfig | null;
 }) => Promise<ReviewVerdict>;

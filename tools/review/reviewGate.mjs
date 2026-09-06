@@ -12,7 +12,7 @@
 import { isReviewable } from './reviewablePaths.mjs';
 import { COMPARE_FILE_CAP, coversAllOf, diffEntries, isDescribable } from './diffFingerprint.mjs';
 import { isFullReviewFinished } from './reviewMarkers.mjs';
-import { isAutoReviewedBase } from './baseBranches.mjs';
+import { autoReviewState } from './autoReview.mjs';
 
 /**
  * Exact logins, not a substring match.
@@ -99,7 +99,7 @@ export const evaluate = async ({
   repo,
   pr,
   excludedPaths = [],
-  baseBranches = null,
+  autoReview = null,
 }) => {
   const [issueComments, reviewComments, reviews, prData] = await Promise.all([
     apiAll(`/repos/${repo}/issues/${pr}/comments`),
@@ -277,16 +277,17 @@ export const evaluate = async ({
   const reviewed = walkthrough || findings > 0 || submitted > 0 || claudeReviewed;
 
   /*
-   * Whether this pull request is one CodeRabbit will ever auto-review.
+   * Whether this pull request is one CodeRabbit will ever auto-review, and if not, why.
    *
-   * `null` when nothing is known — no config, or no `base_branches` in it — because "we cannot
-   * tell" and "no branch qualifies" want different words, and only one of them is worth saying.
+   * `unknown` when nothing was configured to check against — that has to stay distinct from
+   * every real setting, because "we cannot tell" and "no branch qualifies" want different words
+   * and only one of them is worth saying out loud.
    */
-  const autoReviewedBase = baseRef === null ? null : isAutoReviewedBase(baseBranches, baseRef);
+  const autoReviewStatus = baseRef === null ? 'unknown' : autoReviewState(autoReview, baseRef);
 
   return {
     baseRef,
-    autoReviewedBase,
+    autoReviewStatus,
     title: prData?.title ?? '',
     headSha,
     headAt,

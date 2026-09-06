@@ -21,7 +21,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { parseExcludedPaths } from './reviewablePaths.mjs';
-import { parseBaseBranches } from './baseBranches.mjs';
+import { parseAutoReview } from './autoReview.mjs';
 import { evaluate } from './reviewGate.mjs';
 
 const REPO = process.env['GITHUB_REPOSITORY'] ?? 'dharlabs/occasio';
@@ -92,9 +92,9 @@ const reviewerConfig = (() => {
 })();
 
 const excludedPaths = reviewerConfig === null ? [] : parseExcludedPaths(reviewerConfig);
-const baseBranches = reviewerConfig === null ? null : parseBaseBranches(reviewerConfig);
+const autoReview = reviewerConfig === null ? null : parseAutoReview(reviewerConfig);
 
-const v = await evaluate({ api, apiAll, repo: REPO, pr, excludedPaths, baseBranches });
+const v = await evaluate({ api, apiAll, repo: REPO, pr, excludedPaths, autoReview });
 
 console.log(`PR #${pr} — ${v.title}`);
 console.log(`  status      : ${v.reviewerState} | ${v.reviewerDescription}`);
@@ -134,7 +134,15 @@ if (!v.reviewed) {
    * not resolve at all, however long anybody waits — #132 sat idle for seven and a half hours
    * looking exactly like the first case. Saying which one it is turns a wait into an action.
    */
-  if (v.autoReviewedBase === false) {
+  if (v.autoReviewStatus === 'disabled') {
+    console.error(
+      '\nNOT REVIEWED. Auto review is switched off for this repository — `reviews.auto_review.enabled` is false in .coderabbit.yaml, so no pull request is picked up automatically.',
+    );
+    console.error('This will not resolve on its own. Either turn it back on, or ask for a');
+    console.error('review by hand with an `@coderabbitai review` comment on the pull request.');
+    process.exit(1);
+  }
+  if (v.autoReviewStatus === 'base-not-configured') {
     console.error(
       `\nNOT REVIEWED. Auto review is not enabled for the base branch \`${v.baseRef ?? '?'}\`, so CodeRabbit skipped this pull request.`,
     );

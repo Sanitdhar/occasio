@@ -52,7 +52,7 @@ type Lists = Record<string, () => unknown[]>;
 
 type Scenario = {
   baseRef?: string;
-  baseBranches?: string[] | null;
+  autoReview?: { enabled: boolean; patterns: string[] | null } | null;
   headSha?: string;
   headAt?: string | null;
   issueComments?: unknown[];
@@ -118,7 +118,10 @@ const run = async (scenario: Scenario = {}) => {
     repo: REPO,
     pr: PR,
     excludedPaths: scenario.excludedPaths ?? ['package-lock.json', '**/__screenshots__/**'],
-    baseBranches: scenario.baseBranches === undefined ? ['^main$'] : scenario.baseBranches,
+    autoReview:
+      scenario.autoReview === undefined
+        ? { enabled: true, patterns: ['^main$'] }
+        : scenario.autoReview,
   });
 
   return { verdict, asked, unrouted };
@@ -386,23 +389,40 @@ describe('the review gate', () => {
        */
       const v = await gate({
         baseRef: 'review/unreviewed-baseline',
-        baseBranches: ['^main$', '^feat/.*'],
+        autoReview: { enabled: true, patterns: ['^main$', '^feat/.*'] },
         issueComments: [],
       });
-      expect(v).toMatchObject({ reviewed: false, autoReviewedBase: false, ok: false });
+      expect(v).toMatchObject({
+        reviewed: false,
+        autoReviewStatus: 'base-not-configured',
+        ok: false,
+      });
       expect(v.baseRef).toBe('review/unreviewed-baseline');
     });
 
     it('does not blame the base branch when it is configured', async () => {
       /* A PR simply waiting its turn must not be told to go and edit the reviewer's config. */
-      const v = await gate({ baseBranches: ['^main$'], issueComments: [] });
-      expect(v).toMatchObject({ reviewed: false, autoReviewedBase: true });
+      const v = await gate({
+        autoReview: { enabled: true, patterns: ['^main$'] },
+        issueComments: [],
+      });
+      expect(v).toMatchObject({ reviewed: false, autoReviewStatus: 'eligible' });
+    });
+
+    it('blames auto review being off, not the branch, when the whole mechanism is disabled', async () => {
+      /* Reading only the patterns reports this PR as eligible and stays silent — in the one
+         case where nothing anybody does to the branch will ever produce a review. */
+      const v = await gate({
+        autoReview: { enabled: false, patterns: ['^main$'] },
+        issueComments: [],
+      });
+      expect(v).toMatchObject({ reviewed: false, autoReviewStatus: 'disabled' });
     });
 
     it('says nothing when there is no configuration to judge against', async () => {
-      /* Null, not false. "We cannot tell" must not print as "this can never be reviewed". */
-      const v = await gate({ baseBranches: null, issueComments: [] });
-      expect(v).toMatchObject({ reviewed: false, autoReviewedBase: null });
+      /* "We cannot tell" must not print as "this can never be reviewed". */
+      const v = await gate({ autoReview: null, issueComments: [] });
+      expect(v).toMatchObject({ reviewed: false, autoReviewStatus: 'unknown' });
     });
   });
 
