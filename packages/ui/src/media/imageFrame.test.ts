@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { imageAccessibility, scrimGeometry } from './imageFrame';
+import { hasOverlay, imageAccessibility, scrimGeometry } from './imageFrame';
 
 describe('imageAccessibility', () => {
   it('announces an image that has alternative text', () => {
@@ -23,6 +23,25 @@ describe('imageAccessibility', () => {
     expect(props.accessibilityElementsHidden).toBe(true);
     expect(props.importantForAccessibility).toBe('no-hide-descendants');
     expect(props.accessibilityRole).toBeUndefined();
+  });
+});
+
+describe('hasOverlay', () => {
+  it('counts anything React will actually paint', () => {
+    expect(hasOverlay('A caption')).toBe(true);
+    expect(hasOverlay(0)).toBe(true);
+    expect(hasOverlay([])).toBe(true);
+  });
+
+  it('does not count the values a JSX conditional collapses to', () => {
+    /* The reason this function exists. `{title && <Text />}` is `false` when the title is empty
+       and `{caption ?? null}` is `null` — React paints nothing for either, so a scrim and an
+       empty overlay over a bare photograph would be the visible cost of checking only for
+       `undefined`. */
+    expect(hasOverlay(undefined)).toBe(false);
+    expect(hasOverlay(null)).toBe(false);
+    expect(hasOverlay(false)).toBe(false);
+    expect(hasOverlay(true)).toBe(false);
   });
 });
 

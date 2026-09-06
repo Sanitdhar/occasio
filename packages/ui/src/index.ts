@@ -17,6 +17,7 @@ export {
 
 export { Image, type ImageAspect, type ImageProps, type ImageRadius } from './media/Image';
 export {
+  hasOverlay,
   imageAccessibility,
   scrimGeometry,
   type ImageAccessibility,

@@ -1,11 +1,14 @@
+import type { ReactNode } from 'react';
+
 /**
- * The two decisions an image frame makes that are worth testing on their own: how the picture is
- * described to a screen reader, and where the scrim sits.
+ * The decisions an image frame makes that are worth testing on their own: how the picture is
+ * described to a screen reader, whether there is anything overlaid on it, and where the scrim
+ * sits.
  *
- * Both live here rather than inside `Image.tsx` because this file imports neither React nor
- * React Native, so it runs in a plain Jest process. Component render tests are not possible in
- * this repo yet (#110); pulling the judgement out of the JSX is what keeps any of this covered
- * in the meantime.
+ * They live here rather than inside `Image.tsx` because this file pulls in no runtime import at
+ * all — the one `import type` is erased — so it runs in a plain Jest process. Component render
+ * tests are not possible in this repo yet (#110); pulling the judgement out of the JSX is what
+ * keeps any of this covered in the meantime.
  */
 
 /* -------------------------------------------------------------------------------------------
@@ -49,6 +52,21 @@ export const imageAccessibility = (alt: string | undefined): ImageAccessibility 
         accessibilityElementsHidden: false,
         importantForAccessibility: 'yes',
       };
+
+/* -------------------------------------------------------------------------------------------
+ * Overlay
+ * ----------------------------------------------------------------------------------------- */
+
+/**
+ * Whether the `children` slot will actually paint something.
+ *
+ * `children === undefined` is not enough. `{title && <Text>{title}</Text>}` evaluates to `false`
+ * when the title is empty and `{caption ?? null}` to `null` — React renders nothing for either,
+ * and both are how a caller writes "sometimes there is a caption". Treating them as content puts
+ * a scrim and an empty overlay over a photograph that has no text on it at all.
+ */
+export const hasOverlay = (children: ReactNode): boolean =>
+  children !== undefined && children !== null && typeof children !== 'boolean';
 
 /* -------------------------------------------------------------------------------------------
  * Scrim

@@ -4,7 +4,7 @@ import { type ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { createStyles } from '../theme/createStyles';
 import { useTheme } from '../theme/useTheme';
-import { imageAccessibility, scrimGeometry, type ScrimPlacement } from './imageFrame';
+import { hasOverlay, imageAccessibility, scrimGeometry, type ScrimPlacement } from './imageFrame';
 
 /**
  * The only image component in Occasio. Reaching for `react-native`'s `Image` is a bug.
@@ -66,7 +66,14 @@ type ImageFrameProps = {
   readonly recyclingKey?: string | undefined;
   /** Rendered over the scrim, pinned to the bottom of the frame. */
   readonly children?: ReactNode;
-  readonly style?: StyleProp<ViewStyle> | undefined;
+  /**
+   * Margins, width, position — the frame's place in its parent.
+   *
+   * `aspectRatio` is deliberately not assignable: the ratio is the token's decision, and an
+   * escape hatch that can quietly reintroduce a mixed set of ratios is not an escape hatch, it
+   * is the rule with an opt-out. Use `aspect` to choose between the ratios the system has.
+   */
+  readonly style?: StyleProp<Omit<ViewStyle, 'aspectRatio'>> | undefined;
 };
 
 /**
@@ -127,6 +134,9 @@ const useStyles = createStyles((t) => ({
 export function Image({
   source,
   blurhash,
+  /* `decorative` is a type-level marker and nothing else — it exists so that omitting `alt`
+     has to be written down. At runtime the absence of `alt` is the whole signal, which is why
+     it is not destructured here. */
   alt,
   aspect = 'hero',
   radius = 'hero',
@@ -139,9 +149,10 @@ export function Image({
   const theme = useTheme();
   const styles = useStyles();
 
+  const overlaid = hasOverlay(children);
   const geometry = scrimGeometry(
     theme.image.scrimGradient,
-    scrim ?? (children === undefined ? 'none' : 'bottom'),
+    scrim ?? (overlaid ? 'bottom' : 'none'),
   );
 
   return (
@@ -184,7 +195,7 @@ export function Image({
           style={styles.scrim}
         />
       )}
-      {children === undefined ? null : <View style={styles.overlay}>{children}</View>}
+      {overlaid ? <View style={styles.overlay}>{children}</View> : null}
     </View>
   );
 }
