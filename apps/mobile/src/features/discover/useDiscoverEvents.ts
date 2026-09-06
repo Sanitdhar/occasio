@@ -33,6 +33,14 @@ export type Discovery = {
   readonly events: readonly DiscoverEvent[];
   readonly loading: boolean;
   readonly failed: boolean;
+  /**
+   * Retries the listing.
+   *
+   * Returned rather than left to the caller to invent, because the screen's failure state offers
+   * a retry only when it is given one — so a hook that kept this to itself produced a page whose
+   * one control was a dead end, on the only screen somebody sees when the listing fails.
+   */
+  readonly retry: () => void;
 };
 
 export const useDiscoverEvents = (): Discovery => {
@@ -66,6 +74,9 @@ export const useDiscoverEvents = (): Discovery => {
       theme: configs[index]?.data?.published?.config.theme ?? null,
     })),
     loading: listing.isPending,
+    retry: () => {
+      void listing.refetch();
+    },
     /* Only the listing failing is a failure: a config that will not load costs one card its
        palette, and a card in the wrong palette is still a way into the event. */
     failed: listing.isError,
