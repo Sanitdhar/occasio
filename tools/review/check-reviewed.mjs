@@ -16,6 +16,7 @@
  *   requests also work, at a lower rate limit.
  */
 import { readFileSync } from 'node:fs';
+import { COMPARE_FILE_CAP, diffFingerprint, isDescribable } from './diffFingerprint.mjs';
 
 /**
  * Exact logins, not a substring match.
@@ -151,13 +152,75 @@ const lastReviewAt = reviewEvidence.length === 0 ? null : reviewEvidence.sort().
 
 const headCommit = await apiOne(`/repos/${REPO}/commits/${prData.head.sha}`);
 const headAt = headCommit.commit?.committer?.date ?? null;
+
+/**
+ * The change a commit proposes, independent of where it sits in history.
+ *
+ * `/compare/base...head` is three-dot, so it reports the difference from the merge base — the
+ * pull request's own changes, without whatever the base branch has done since. Hashing the
+ * patches gives a value that survives a rebase and moves the moment a line does.
+ */
+const effectiveDiff = async (sha) => {
+  try {
+    const comparison = await apiOne(
+      `/repos/${REPO}/compare/${prData.base.ref}...${sha}?per_page=300`,
+    );
+    /*
+     * Everything below fails closed, because this function's answer is used to skip a review and
+     * every uncertainty here is shaped the same way: two incomplete comparisons produce equal
+     * fingerprints, and equal reads as "already reviewed".
+     */
+    const files = comparison.files;
+    /* An absent list fingerprints as the empty string, and so does another absent list. */
+    if (!Array.isArray(files)) return null;
+    /* The endpoint stops at 300 files; at the cap the list is truncated, so a file nobody
+       listed can differ while the two fingerprints match. */
+    if (files.length >= COMPARE_FILE_CAP) return null;
+    /* A file with neither a patch nor a blob sha is a file this cannot describe. Both would
+       serialise as `binary:unknown`, which is one unknown matching another. */
+    if (!files.every(isDescribable)) return null;
+    return diffFingerprint(files);
+  } catch {
+    /* A force-pushed commit can fall out of reach. Unknown is not "unchanged". */
+    return null;
+  }
+};
+
+/*
+ * A rebase is not a change to the code.
+ *
+ * Branch protection requires a branch to be up to date, so every open PR is rebased whenever
+ * `main` moves — and the head commit is then newer than its review while proposing exactly the
+ * same diff. CodeRabbit will not re-review that, correctly, because there is nothing new to
+ * read, so a date comparison alone leaves the PR stuck between a gate wanting a review and a
+ * reviewer with no reason to give one (#140).
+ *
+ * So the date is the cheap check and the diff is the authority: when the newest review sits on
+ * a commit proposing the same effective diff as the head, the review still applies. Any real
+ * edit changes the patches and this stops helping, which is the point.
+ */
+const reviewedSha = [...reviews]
+  .filter((r) => byReviewer(r) && r.submitted_at != null)
+  .sort((a, b) => (a.submitted_at < b.submitted_at ? -1 : 1))
+  .at(-1)?.commit_id;
+
+const sameDiffAsReviewed = async () => {
+  if (reviewedSha === undefined || reviewedSha === prData.head.sha) return false;
+  const [reviewedDiff, headDiff] = await Promise.all([
+    effectiveDiff(reviewedSha),
+    effectiveDiff(prData.head.sha),
+  ]);
+  return reviewedDiff !== null && headDiff !== null && reviewedDiff === headDiff;
+};
 /*
  * Fails closed. An absent timestamp is a reason to look rather than to pass, and treating one
  * as `not stale` would have made every unknown a quiet approval — which is the failure this
  * whole file exists to answer, reintroduced by its newest check.
  */
-const stale =
+const newerThanReview =
   lastReviewAt == null || headAt === null ? true : Date.parse(headAt) > Date.parse(lastReviewAt);
+const rebasedOnly = newerThanReview && (await sameDiffAsReviewed());
+const stale = newerThanReview && !rebasedOnly;
 
 const reviewed = walkthrough || findings > 0 || submitted > 0 || claudeReviewed;
 
@@ -172,6 +235,11 @@ console.log(`  rate limited: ${String(rateLimited)}`);
 console.log(`  claude      : ${String(claudeReviewed)} (findings: ${String(claudeFindings)})`);
 console.log(`  last review : ${lastReviewAt ?? 'none'}`);
 console.log(`  head commit : ${prData.head.sha.slice(0, 7)} ${headAt ?? 'unknown'}`);
+if (rebasedOnly) {
+  console.log(
+    `  rebase only : yes — same effective diff as the reviewed commit ${String(reviewedSha).slice(0, 7)}`,
+  );
+}
 
 if (reviewed && stale) {
   console.error(
