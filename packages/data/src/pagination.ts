@@ -31,9 +31,15 @@ export type Cursor = string;
  */
 export type PageRequest = {
   /**
-   * How many items to return. Adapters clamp into `[1, MAX_PAGE_SIZE]` and fall back to
-   * `DEFAULT_PAGE_SIZE`, so a caller asking for 10,000 gets a page rather than an error; treat
-   * the returned `items.length` as authoritative, never the number you asked for.
+   * How many items to return: an integer of at least 1, or omitted.
+   *
+   * Over-asking is fine and under-asking is a bug, so the two are answered differently. A limit
+   * above `MAX_PAGE_SIZE` is clamped — a caller asking for 10,000 is a caller who will read
+   * `items.length` — and omitting it gives `DEFAULT_PAGE_SIZE`. A limit of zero, a negative or a
+   * fraction raises `ValidationError` instead: none of them can be what the caller meant, and
+   * returning an empty page for `limit: 0` would hide the mistake somewhere far from its cause.
+   *
+   * Treat the returned `items.length` as authoritative, never the number you asked for.
    */
   readonly limit?: number | undefined;
   /** `nextCursor` from the previous page. Omitted for the first page. */

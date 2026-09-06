@@ -1,6 +1,6 @@
 /**
  * The data layer (D5, D29) — repository interfaces, row types matching Postgres exactly, and
- * the adapter swap point. Mock adapters land in build-order step 4; the Supabase adapter lives
+ * the adapter swap point. The mock adapter lives under ./mock/; the Supabase adapter will live
  * under ./supabase/ and is the only place `@supabase/*` may be imported.
  *
  * Three layers meet here and only here:
@@ -199,5 +199,28 @@ export type {
   UserRow,
   VenueRow,
 } from './rows';
+
+/**
+ * The mock adapter (D4). The whole of `./mock/` is reachable as `@occasio/data/mock`; what is
+ * re-exported here is what an app root needs to stand one up — the factory, the seed shape and
+ * the storage port it writes through.
+ */
+export { createMockAdapter, type MockAdapter, type MockAdapterOptions } from './mock/adapter';
+export { createDefaultStorage } from './mock/defaultStorage';
+export {
+  DEFAULT_LATENCY,
+  MOCK_LATENCY_MAX_MS,
+  MOCK_LATENCY_MIN_MS,
+  type LatencyRange,
+} from './mock/latency';
+export {
+  createAsyncStorage,
+  createMemoryStorage,
+  createWebStorage,
+  type AsyncStorageLike,
+  type MockStorage,
+  type WebStorageLike,
+} from './mock/storage';
+export { EMPTY_TABLES, MOCK_STORAGE_KEY, type MockSeed, type MockTables } from './mock/tables';
 
 export const DATA_SCHEMA_VERSION = 1 as const;
