@@ -106,12 +106,21 @@ export function Sheet({ visible, onDismiss, label, children, testID }: Props) {
           aria-modal
           aria-label={label}
           /*
-           * `accessible` is what makes `onAccessibilityEscape` reachable: it is the VoiceOver
-           * two-finger scrub, and without it an iOS user whose sheet has no visible close
-           * control is stuck inside it. The backdrop cannot rescue them -- it is deliberately
-           * hidden from the accessibility tree.
+           * The VoiceOver two-finger scrub, so an iOS user whose sheet has no visible close
+           * control is not stuck inside it. The backdrop cannot rescue them — it is
+           * deliberately hidden from the accessibility tree.
+           *
+           * Deliberately *without* `accessible`. The first version had it, on the theory that
+           * the prop needs an accessibility element to land on; what `accessible` actually does
+           * on a container is merge it and everything under it into one element, which would
+           * hide the sheet's own fields and buttons from VoiceOver and TalkBack — turning a
+           * missing escape gesture into a sheet whose contents cannot be reached at all. UIKit
+           * passes `accessibilityPerformEscape` up the view hierarchy from whatever has focus,
+           * so the handler is found here without this view being an element itself.
+           *
+           * Not covered by the component tests: react-native-web has no equivalent grouping, so
+           * this is a native-only behaviour that the device pass owns.
            */
-          accessible
           onAccessibilityEscape={onDismiss}
           style={[styles.panel, toElevationStyle(theme.elevation.lg)]}
         >

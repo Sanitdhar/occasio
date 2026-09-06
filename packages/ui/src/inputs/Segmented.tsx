@@ -1,11 +1,11 @@
 import { View } from 'react-native';
 import type { LayoutViewStyle } from '../components/layoutStyle';
 import { InteractiveBox } from '../primitives/InteractiveBox';
-import { tonalPalette } from '../primitives/tones';
 import { createStyles } from '../theme/createStyles';
 import { useTheme } from '../theme/useTheme';
 import { Text } from '../components/Text';
 import { RovingGroup } from './RovingGroup';
+import { segmentPalette } from './segmentPalette';
 
 /**
  * A small set of mutually exclusive choices, all visible at once.
@@ -48,9 +48,8 @@ const useStyles = createStyles((t) => ({
     padding: t.space(1),
     gap: t.space(1),
   },
-  /* The unselected segments read as the group's own background rather than as raised cards, so
-     `neutral`'s surface is overridden here — the palette still supplies the content colour and
-     the border, which are the parts that have to stay contrast-checked. */
+  /* Sizing only. What a segment is painted with lives in segmentPalette.ts, where the colour
+     relationship it has to keep is checkable across every preset and seed. */
   segment: {
     flexGrow: 1,
     flexBasis: 0,
@@ -99,9 +98,7 @@ export function Segmented<T extends string>({
       >
         {options.map((option, index) => {
           const selected = option.value === value;
-          /* The selected segment is the brand fill and the rest are transparent, so the choice is
-           legible without relying on a hue difference between two similar greys. */
-          const palette = tonalPalette(theme, selected ? 'brandSolid' : 'neutral');
+          const palette = segmentPalette(theme, selected);
 
           return (
             <InteractiveBox
