@@ -1,6 +1,11 @@
 import * as Linking from 'expo-linking';
 import { readRecentTenant } from './recentTenant';
-import { firstResolved, slugFromPath, type TenantResolution } from './tenantResolution';
+import {
+  firstResolved,
+  pathFromLink,
+  slugFromPath,
+  type TenantResolution,
+} from './tenantResolution';
 
 /**
  * Native: the deep link it was opened with, then where this device was last.
@@ -34,15 +39,13 @@ const readInitialUrl = async (): Promise<string | null> => {
 /**
  * The path part of a deep link, however the link was spelled.
  *
- * `occasio://e/lila-and-sam` and `https://occasio.app/e/lila-and-sam` have to reach the same
- * slug, and they parse differently: a custom scheme puts `e` in the host and `lila-and-sam` in
- * the path. `Linking.parse` normalises that, and its `path` is returned without a leading slash,
- * which `slugFromPath` would otherwise read as a first empty segment.
+ * The parsing belongs to expo-linking and the rule about what the parts mean belongs to
+ * `pathFromLink`, where it can be run without the native linking runtime. Keeping them apart is
+ * the point: the rule was wrong in its first version, and there was nowhere to notice.
  */
 const pathOf = (url: string): string => {
   try {
-    const { path } = Linking.parse(url);
-    return path === null ? '' : `/${path}`;
+    return pathFromLink(Linking.parse(url));
   } catch {
     return '';
   }

@@ -90,6 +90,47 @@ export const slugFromPath = (pathname: string): string | null => {
 };
 
 /**
+ * The parts a deep link is parsed into, which is all this needs to know about one.
+ *
+ * Named structurally rather than imported from expo-linking, so the rule below can be tested in
+ * a plain process — the module that does the parsing pulls in the native linking runtime, and a
+ * rule nobody can run is how the first version of it stayed wrong.
+ */
+export type LinkParts = {
+  readonly scheme?: string | null;
+  readonly hostname?: string | null;
+  readonly path?: string | null;
+};
+
+/** The schemes where the hostname is a host rather than the first segment of the path. */
+const WEB_SCHEMES = new Set(['http', 'https']);
+
+/**
+ * The canonical path a deep link is pointing at, whichever way it was spelled.
+ *
+ * These two have to reach the same event and do not parse the same way:
+ *
+ *     occasio://e/lila-and-sam          scheme occasio, hostname `e`,           path `lila-and-sam`
+ *     https://occasio.app/e/lila-and-sam  scheme https, hostname `occasio.app`, path `e/lila-and-sam`
+ *
+ * A custom scheme has no authority component, so what sits in that position is the first
+ * segment of the path and dropping it loses the `/e/` prefix — which is exactly what the first
+ * version of this did, leaving the deep link, native's *primary* source, silently unable to
+ * resolve anything. Under an `https` link the same field is a real host and has to go.
+ *
+ * The comment there claimed `Linking.parse` normalised the difference. It does not, and a
+ * comment asserting what the code does not do is worse than none: it is why nothing looked.
+ */
+export const pathFromLink = (parts: LinkParts): string => {
+  const scheme = (parts.scheme ?? '').toLowerCase();
+  const hostname = parts.hostname ?? '';
+  const path = parts.path ?? '';
+
+  const segments = WEB_SCHEMES.has(scheme) || hostname === '' ? [path] : [hostname, path];
+  return `/${segments.filter((segment) => segment !== '').join('/')}`;
+};
+
+/**
  * The first source that produces a slug, in the order given.
  *
  * The order is the whole policy — a deep link the user just followed beats the event they

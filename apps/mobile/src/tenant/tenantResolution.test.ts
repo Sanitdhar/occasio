@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { firstResolved, isSlug, slugFromPath } from './tenantResolution';
+import { firstResolved, isSlug, pathFromLink, slugFromPath } from './tenantResolution';
 
 /**
  * A slug from here becomes a path segment and then a repository argument, and it arrives from a
@@ -79,6 +79,73 @@ describe('slugFromPath', () => {
     /* `decodeURIComponent` throws on a lone `%`. A URL is attacker-supplied on web. */
     expect(slugFromPath('/e/%')).toBeNull();
     expect(slugFromPath('/e/%zz')).toBeNull();
+  });
+});
+
+describe('pathFromLink', () => {
+  /**
+   * The two spellings of the same deep link, which do not parse the same way. This is native's
+   * primary source, and the first version of the rule dropped the authority segment of a custom
+   * scheme — so `occasio://e/lila-and-sam` produced `/lila-and-sam`, matched no route, and the
+   * app fell through to storage or to the join screen. Silently, on the one path a person had
+   * just deliberately followed.
+   */
+  it('keeps the authority segment of a custom scheme, where it is really the first path segment', () => {
+    expect(pathFromLink({ scheme: 'occasio', hostname: 'e', path: 'lila-and-sam' })).toBe(
+      '/e/lila-and-sam',
+    );
+    expect(pathFromLink({ scheme: 'occasio', hostname: 'e', path: 'lila-and-sam/schedule' })).toBe(
+      '/e/lila-and-sam/schedule',
+    );
+  });
+
+  it('drops it for an http(s) link, where it is a real host', () => {
+    expect(pathFromLink({ scheme: 'https', hostname: 'occasio.app', path: 'e/lila-and-sam' })).toBe(
+      '/e/lila-and-sam',
+    );
+    expect(pathFromLink({ scheme: 'HTTP', hostname: 'occasio.app', path: 'e/x' })).toBe('/e/x');
+  });
+
+  it('reaches the same slug from either spelling', () => {
+    /* The property that matters, stated as one: a link is a link. */
+    const viaScheme = pathFromLink({ scheme: 'occasio', hostname: 'e', path: 'lila-and-sam' });
+    const viaHttps = pathFromLink({
+      scheme: 'https',
+      hostname: 'occasio.app',
+      path: 'e/lila-and-sam',
+    });
+
+    expect(slugFromPath(viaScheme)).toBe('lila-and-sam');
+    expect(slugFromPath(viaScheme)).toBe(slugFromPath(viaHttps));
+  });
+
+  it('handles a triple-slash custom scheme, where the authority is empty', () => {
+    /* `occasio:///e/lila-and-sam` is legal and puts everything in the path. Prepending an empty
+       hostname would produce a leading empty segment. */
+    expect(pathFromLink({ scheme: 'occasio', hostname: '', path: 'e/lila-and-sam' })).toBe(
+      '/e/lila-and-sam',
+    );
+    expect(pathFromLink({ scheme: 'occasio', hostname: null, path: 'e/lila-and-sam' })).toBe(
+      '/e/lila-and-sam',
+    );
+  });
+
+  it('produces a canonical path, with no doubled slashes', () => {
+    /*
+     * `slugFromPath` discards empty segments anyway, so this changes no outcome today — which
+     * is exactly why it is pinned here. The function's contract is a path, and a link that ends
+     * at the authority (`occasio://e`) is the shape that would otherwise start producing `/e/`
+     * the day something else reads this value.
+     */
+    expect(pathFromLink({ scheme: 'occasio', hostname: 'e', path: '' })).toBe('/e');
+    expect(pathFromLink({ scheme: 'https', hostname: 'occasio.app', path: '' })).toBe('/');
+  });
+
+  it('answers a bare slash when the link carries nothing', () => {
+    /* `slugFromPath` reads that as no tenant, which is the right answer for a link that names
+       no event — an app opened by its icon, say. */
+    expect(pathFromLink({})).toBe('/');
+    expect(slugFromPath(pathFromLink({}))).toBeNull();
   });
 });
 
