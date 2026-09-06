@@ -65,6 +65,13 @@ export const queryKeys = {
     forUser: (userId: UserId) => ['directory', 'forUser', userId] as const,
   },
 
+  tenants: {
+    /* Under the tenant prefix like everything else, so invalidating an event clears its theme
+       along with its data — publishing a new config is exactly the case where a stale theme
+       would otherwise survive a refresh. */
+    config: (t: TenantId) => [...tenant(t), 'config'] as const,
+  },
+
   sessions: {
     all: (t: TenantId) => [...tenant(t), 'sessions'] as const,
     list: (t: TenantId, query: SessionQuery, request?: PageRequest) =>
