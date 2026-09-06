@@ -1,5 +1,6 @@
 import {
   announcementId as toAnnouncementId,
+  approvalRequestId,
   assignmentId as toAssignmentId,
   gossipPostId as toGossipPostId,
   membershipId as toMembershipId,
@@ -121,7 +122,7 @@ import {
   type Random,
   type Sleep,
 } from './latency';
-import { approvalRequestId, cloneJson as clone, parseSnapshot, serialiseSnapshot } from './mappers';
+import { cloneJson as clone, parseSnapshot, serialiseSnapshot } from './mappers';
 import { numericKey, paginate, timestampKey } from './paging';
 import type { MockStorage } from './storage';
 import {

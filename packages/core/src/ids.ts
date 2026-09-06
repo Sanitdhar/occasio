@@ -26,6 +26,9 @@ export type UnitId = Branded<'Unit'>;
 export type AssignmentId = Branded<'Assignment'>;
 export type MembershipId = Branded<'Membership'>;
 export type AnnouncementId = Branded<'Announcement'>;
+export type ApprovalRequestId = Branded<'ApprovalRequest'>;
+export type DeviceTokenId = Branded<'DeviceToken'>;
+export type NotificationDeliveryId = Branded<'NotificationDelivery'>;
 
 /*
  * The constructors below are the only place in the repo (with mappers.ts) where a raw string
@@ -45,3 +48,7 @@ export const unitId = (value: string): UnitId => value as UnitId;
 export const assignmentId = (value: string): AssignmentId => value as AssignmentId;
 export const membershipId = (value: string): MembershipId => value as MembershipId;
 export const announcementId = (value: string): AnnouncementId => value as AnnouncementId;
+export const approvalRequestId = (value: string): ApprovalRequestId => value as ApprovalRequestId;
+export const deviceTokenId = (value: string): DeviceTokenId => value as DeviceTokenId;
+export const notificationDeliveryId = (value: string): NotificationDeliveryId =>
+  value as NotificationDeliveryId;

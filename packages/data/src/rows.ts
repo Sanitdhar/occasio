@@ -1,10 +1,12 @@
 import type {
   AnnouncementId,
+  ApprovalRequestId,
   AssignmentId,
-  Branded,
+  DeviceTokenId,
   GossipPostId,
   MediaId,
   MembershipId,
+  NotificationDeliveryId,
   PersonId,
   PersonaId,
   SessionId,
@@ -62,17 +64,14 @@ export type IanaTimeZone = string;
 export type JsonObject = Readonly<Record<string, unknown>>;
 
 /* ---------------------------------------------------------------------------------------------
- * Ids that do not exist in @occasio/core yet
+ * Ids
  *
- * The other thirteen ids live in `packages/core/src/ids.ts` and belong there. These three are
- * declared here only because the rows that need them arrive with this change; they are plain
- * `Branded` aliases over the same machinery, so moving them into core later is a cut-and-paste
- * with no call-site changes. See the PR discussion.
+ * All sixteen live in `packages/core/src/ids.ts`. These three are re-exported rather than
+ * imported-and-forgotten because the row types below name them, and a reader following
+ * `ApprovalRequestRow.id` should land somewhere that says where the type comes from.
  * ------------------------------------------------------------------------------------------- */
 
-export type ApprovalRequestId = Branded<'ApprovalRequest'>;
-export type DeviceTokenId = Branded<'DeviceToken'>;
-export type NotificationDeliveryId = Branded<'NotificationDelivery'>;
+export type { ApprovalRequestId, DeviceTokenId, NotificationDeliveryId } from '@occasio/core';
 
 /* ---------------------------------------------------------------------------------------------
  * Enumerations

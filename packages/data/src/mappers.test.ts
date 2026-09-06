@@ -1,12 +1,15 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   announcementId,
+  approvalRequestId,
   assignmentId,
   gossipPostId,
   mediaId,
   membershipId,
   personId,
   personaId,
+  deviceTokenId,
+  notificationDeliveryId,
   sessionId,
   taskId,
   tenantId,
@@ -18,10 +21,13 @@ import { themeInputFromPreset } from '@occasio/theme';
 import type { TenantConfig } from './config';
 import {
   toAnnouncement,
+  toApprovalRequest,
   toAssignment,
+  toDeviceToken,
   toGossipPost,
   toMediaAsset,
   toMembership,
+  toNotificationDelivery,
   toNotificationPreferences,
   toPerson,
   toPersona,
@@ -37,7 +43,10 @@ import {
 } from './mappers';
 import type {
   AnnouncementRow,
+  ApprovalRequestRow,
   AssignmentRow,
+  DeviceTokenRow,
+  NotificationDeliveryRow,
   GossipPostRow,
   MediaAssetRow,
   MembershipRow,
@@ -60,11 +69,11 @@ import type {
  * `created_at` where it meant `updated_at` is the most likely mistake in a file of forty renames,
  * and it is invisible to a test whose fixture uses the same timestamp twice.
  *
- * Three mappers have no sample here — `toApprovalRequest`, `toDeviceToken` and
- * `toNotificationDelivery`. Their branded ids have no constructor in `@occasio/core` yet, and
- * casting one into existence is a lint error everywhere but this package's `mappers.ts`. They are
- * covered structurally by `rows.test.ts` instead. See the PR: those three ids want moving into
- * core, which would let these tests be written the same way as the rest.
+ * Every mapper has a sample now. Three of them did not until #118: their branded ids lived in
+ * `rows.ts` with no constructor, and casting one into existence is a lint error everywhere but
+ * a `mappers.ts` — so they were covered structurally and the three most easily mistyped fields
+ * in the schema (`session_id`, `task_id` and `announcement_id`, all nullable, all on one row)
+ * had no runtime check at all.
  */
 
 const T = tenantId('santi-riyanks');
@@ -671,5 +680,143 @@ describe('toNotificationPreferences', () => {
     ['both', { quiet_hours_start: null, quiet_hours_end: null }],
   ])('has no window without the %s, since it could not be evaluated', (_label, patch) => {
     expect(toNotificationPreferences({ ...row, ...patch }).quietHours).toBeNull();
+  });
+});
+
+describe('toApprovalRequest', () => {
+  const row: ApprovalRequestRow = {
+    id: approvalRequestId('ap_1'),
+    tenant_id: T,
+    status: 'pending',
+    requested_by: ADMIN,
+    requested_at: '2026-01-04T08:00:00Z',
+    reviewed_by: null,
+    reviewed_at: null,
+    note: 'First event on the platform.',
+    created_at: '2026-01-04T07:59:00Z',
+  };
+
+  it('renames every column and drops the one the domain does not carry', () => {
+    expect(toApprovalRequest(row)).toEqual({
+      id: approvalRequestId('ap_1'),
+      tenantId: T,
+      status: 'pending',
+      requestedBy: ADMIN,
+      requestedAt: '2026-01-04T08:00:00Z',
+      reviewedBy: null,
+      reviewedAt: null,
+      note: 'First event on the platform.',
+    });
+  });
+
+  it('carries a completed review through, with reviewer and time distinct from the request', () => {
+    /* `requested_at` and `reviewed_at` are the pair most likely to be crossed, and a fixture
+       reusing one timestamp could not tell. */
+    const reviewed = toApprovalRequest({
+      ...row,
+      status: 'approved',
+      reviewed_by: userId('u_super'),
+      reviewed_at: '2026-01-05T11:15:00Z',
+    });
+
+    expect(reviewed.requestedAt).toBe('2026-01-04T08:00:00Z');
+    expect(reviewed.reviewedAt).toBe('2026-01-05T11:15:00Z');
+    expect(reviewed.reviewedBy).toBe(userId('u_super'));
+  });
+});
+
+describe('toDeviceToken', () => {
+  const row: DeviceTokenRow = {
+    id: deviceTokenId('dt_1'),
+    user_id: ADMIN,
+    platform: 'ios',
+    token: 'ExponentPushToken[xxxxxx]',
+    last_seen_at: '2026-01-09T21:00:00Z',
+    revoked_at: null,
+    created_at: '2026-01-02T06:00:00Z',
+  };
+
+  it('renames every column and does not leak the created timestamp', () => {
+    expect(toDeviceToken(row)).toEqual({
+      id: deviceTokenId('dt_1'),
+      userId: ADMIN,
+      platform: 'ios',
+      token: 'ExponentPushToken[xxxxxx]',
+      lastSeenAt: '2026-01-09T21:00:00Z',
+      revokedAt: null,
+    });
+  });
+
+  it('keeps a revoked token revoked', () => {
+    /* A revoked token that mapped to `revokedAt: null` would be sent push notifications
+       forever, and the failure is silent at every layer above this one. */
+    expect(toDeviceToken({ ...row, revoked_at: '2026-02-01T00:00:00Z' }).revokedAt).toBe(
+      '2026-02-01T00:00:00Z',
+    );
+  });
+});
+
+describe('toNotificationDelivery', () => {
+  const row: NotificationDeliveryRow = {
+    id: notificationDeliveryId('nd_1'),
+    tenant_id: T,
+    user_id: ADMIN,
+    category: 'schedule',
+    channel: 'push',
+    dedupe_key: 'session:s_1:starting',
+    session_id: sessionId('s_1'),
+    task_id: null,
+    announcement_id: null,
+    status: 'sent',
+    failure_reason: null,
+    scheduled_for: '2026-02-14T09:30:00Z',
+    sent_at: '2026-02-14T09:30:04Z',
+    created_at: '2026-02-13T18:00:00Z',
+  };
+
+  it('renames every column, including the three nullable subject ids', () => {
+    expect(toNotificationDelivery(row)).toEqual({
+      id: notificationDeliveryId('nd_1'),
+      tenantId: T,
+      userId: ADMIN,
+      category: 'schedule',
+      channel: 'push',
+      dedupeKey: 'session:s_1:starting',
+      sessionId: sessionId('s_1'),
+      taskId: null,
+      announcementId: null,
+      status: 'sent',
+      failureReason: null,
+      scheduledFor: '2026-02-14T09:30:00Z',
+      sentAt: '2026-02-14T09:30:04Z',
+    });
+  });
+
+  it('does not confuse one subject id for another', () => {
+    /* Three nullable ids of the same shape on one row: the case a rename is most likely to get
+       wrong, and the one a single-subject fixture cannot detect. */
+    const forTask = toNotificationDelivery({
+      ...row,
+      session_id: null,
+      task_id: taskId('tk_9'),
+      category: 'tasks',
+    });
+
+    expect(forTask.taskId).toBe(taskId('tk_9'));
+    expect(forTask.sessionId).toBeNull();
+    expect(forTask.announcementId).toBeNull();
+  });
+
+  it('keeps the reason a delivery failed', () => {
+    const failed = toNotificationDelivery({
+      ...row,
+      status: 'failed',
+      sent_at: null,
+      failure_reason: 'DeviceNotRegistered',
+    });
+
+    expect(failed.status).toBe('failed');
+    expect(failed.failureReason).toBe('DeviceNotRegistered');
+    expect(failed.sentAt).toBeNull();
   });
 });
