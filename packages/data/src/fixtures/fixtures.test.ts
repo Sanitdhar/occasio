@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
+import type { TenantId } from '@occasio/core';
 import { ThemeInputSchema, resolveTheme } from '@occasio/theme';
 import { FEATURE_KEYS } from '../config';
 import { FIXTURE_SEED } from './index';
@@ -15,21 +16,82 @@ import { FIXTURE_SEED } from './index';
 
 const seed = FIXTURE_SEED;
 
-/** Every row in a tenant-scoped table, paired with the id it claims to belong to. */
-const scoped = [
-  ...seed.venues.map((r) => ({ table: 'venues', id: String(r.id), tenant: r.tenant_id })),
-  ...seed.sessions.map((r) => ({ table: 'sessions', id: String(r.id), tenant: r.tenant_id })),
-  ...seed.people.map((r) => ({ table: 'people', id: String(r.id), tenant: r.tenant_id })),
-  ...seed.mediaAssets.map((r) => ({ table: 'mediaAssets', id: String(r.id), tenant: r.tenant_id })),
-  ...seed.personas.map((r) => ({ table: 'personas', id: String(r.id), tenant: r.tenant_id })),
-  ...seed.gossipPosts.map((r) => ({ table: 'gossipPosts', id: String(r.id), tenant: r.tenant_id })),
-  ...seed.tasks.map((r) => ({ table: 'tasks', id: String(r.id), tenant: r.tenant_id })),
-  ...seed.units.map((r) => ({ table: 'units', id: String(r.id), tenant: r.tenant_id })),
+/**
+ * One map per table, not one map of everything.
+ *
+ * A single id-to-tenant map answers "does this id exist somewhere in this tenant", which is not
+ * the question a foreign key asks. `session.venue_id` pointing at a person in the same tenant
+ * passed that check and renders as a session with no venue — the failure the check was written
+ * to catch.
+ */
+const byId = <T extends { readonly tenant_id: TenantId }>(
+  rows: readonly (T & { readonly id: { toString: () => string } })[],
+): ReadonlyMap<string, string> => new Map(rows.map((r) => [String(r.id), String(r.tenant_id)]));
+
+const venues = byId(seed.venues);
+const sessions = byId(seed.sessions);
+const people = byId(seed.people);
+const mediaAssets = byId(seed.mediaAssets);
+const personas = byId(seed.personas);
+const units = byId(seed.units);
+const tasks = byId(seed.tasks);
+const gossipPosts = byId(seed.gossipPosts);
+
+const ALL_SCOPED: readonly ReadonlyMap<string, string>[] = [
+  venues,
+  sessions,
+  people,
+  mediaAssets,
+  personas,
+  units,
+  tasks,
+  gossipPosts,
 ];
 
 const tenantIds = new Set(seed.tenants.map((t) => String(t.id)));
 const userIds = new Set(seed.users.map((u) => String(u.id)));
-const tenantOf = new Map(scoped.map((row) => [row.id, String(row.tenant)]));
+
+/** Every foreign key in the fixture set, with the table it must point into. */
+type Reference = {
+  readonly label: string;
+  readonly from: TenantId;
+  readonly ref: string | null;
+  readonly target: ReadonlyMap<string, string>;
+};
+
+const references = (): readonly Reference[] => {
+  const out: Reference[] = [];
+  const add = (
+    label: string,
+    from: TenantId,
+    ref: { toString: () => string } | null,
+    target: ReadonlyMap<string, string>,
+  ): void => {
+    out.push({ label, from, ref: ref === null ? null : String(ref), target });
+  };
+
+  for (const row of seed.sessions) {
+    add('session.venue_id', row.tenant_id, row.venue_id, venues);
+    add('session.hero_media_id', row.tenant_id, row.hero_media_id, mediaAssets);
+  }
+  for (const row of seed.sessionPeople) {
+    add('sessionPerson.session_id', row.tenant_id, row.session_id, sessions);
+    add('sessionPerson.person_id', row.tenant_id, row.person_id, people);
+  }
+  for (const row of seed.gossipPosts) {
+    add('gossip.persona_id', row.tenant_id, row.persona_id, personas);
+    add('gossip.media_id', row.tenant_id, row.media_id, mediaAssets);
+  }
+  for (const row of seed.tasks) add('task.session_id', row.tenant_id, row.session_id, sessions);
+  for (const row of seed.units) add('unit.venue_id', row.tenant_id, row.venue_id, venues);
+  for (const row of seed.assignments) add('assignment.unit_id', row.tenant_id, row.unit_id, units);
+  for (const row of seed.rsvps) add('rsvp.session_id', row.tenant_id, row.session_id, sessions);
+  for (const row of seed.people) {
+    add('person.photo_media_id', row.tenant_id, row.photo_media_id, mediaAssets);
+  }
+
+  return out;
+};
 
 describe('the fixture set', () => {
   it('has the four events the architecture is meant to be proved on', () => {
@@ -115,75 +177,46 @@ describe('the fixture set', () => {
 
   it('gives no two rows the same id', () => {
     /* An id collision across tenants is how one event's content appears inside another, and it
-       is invisible until it happens on a screen. */
-    const ids = scoped.map((row) => row.id);
+       is invisible until it happens on a screen. Memberships are included because their ids
+       used to be derived from `user_id`, and an unaccepted invitation has none. */
+    const ids = [
+      ...ALL_SCOPED.flatMap((table) => [...table.keys()]),
+      ...seed.memberships.map((m) => String(m.id)),
+    ];
+
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('never points a row at another tenant', () => {
-    /* The failure this guards is the one the whole architecture is about: a wedding rendering a
-       conference's room because a fixture wired the ids across. */
-    const crossings: string[] = [];
-    const sameTenant = (from: { tenant: string; table: string }, ref: string | null): void => {
-      if (ref === null) return;
-      const owner = tenantOf.get(ref);
-      if (owner !== undefined && owner !== from.tenant) {
-        crossings.push(`${from.table} in ${from.tenant} references ${ref} in ${owner}`);
+  it('points every reference into the right table, in the right tenant', () => {
+    /*
+     * Both halves in one pass, because separately each misses what the other assumes. Existence
+     * alone accepts a `venue_id` holding a person's id; tenant alone accepts it too, as long as
+     * the person is in the same event. Either way the screen renders a session with no venue and
+     * nobody can see why.
+     *
+     * The tenant half is the one the whole architecture is about: a wedding showing a
+     * conference's room because a fixture wired the ids across.
+     */
+    const problems: string[] = [];
+
+    for (const { label, from, ref, target } of references()) {
+      if (ref === null) continue;
+      const owner = target.get(ref);
+      if (owner === undefined) {
+        const elsewhere = ALL_SCOPED.some((table) => table.has(ref));
+        problems.push(
+          elsewhere
+            ? `${label} -> ${ref} exists, but not in the table this column points into`
+            : `${label} -> ${ref} does not exist`,
+        );
+        continue;
       }
-    };
-
-    for (const row of seed.sessions) {
-      const from = { tenant: String(row.tenant_id), table: 'session' };
-      sameTenant(from, row.venue_id === null ? null : String(row.venue_id));
-      sameTenant(from, row.hero_media_id === null ? null : String(row.hero_media_id));
-    }
-    for (const row of seed.sessionPeople) {
-      const from = { tenant: String(row.tenant_id), table: 'sessionPerson' };
-      sameTenant(from, String(row.session_id));
-      sameTenant(from, String(row.person_id));
-    }
-    for (const row of seed.gossipPosts) {
-      sameTenant({ tenant: String(row.tenant_id), table: 'gossip' }, String(row.persona_id));
-    }
-    for (const row of seed.tasks) {
-      sameTenant(
-        { tenant: String(row.tenant_id), table: 'task' },
-        row.session_id === null ? null : String(row.session_id),
-      );
-    }
-    for (const row of seed.units) {
-      sameTenant(
-        { tenant: String(row.tenant_id), table: 'unit' },
-        row.venue_id === null ? null : String(row.venue_id),
-      );
-    }
-    for (const row of seed.assignments) {
-      sameTenant({ tenant: String(row.tenant_id), table: 'assignment' }, String(row.unit_id));
+      if (owner !== String(from)) {
+        problems.push(`${label} in ${String(from)} points at ${ref}, which belongs to ${owner}`);
+      }
     }
 
-    expect(crossings).toEqual([]);
-  });
-
-  it('points every reference at something that exists', () => {
-    const missing: string[] = [];
-    const exists = (label: string, ref: string | null): void => {
-      if (ref !== null && !tenantOf.has(ref)) missing.push(`${label} -> ${ref}`);
-    };
-
-    for (const row of seed.sessions) {
-      exists('session.venue_id', row.venue_id === null ? null : String(row.venue_id));
-      exists(
-        'session.hero_media_id',
-        row.hero_media_id === null ? null : String(row.hero_media_id),
-      );
-    }
-    for (const row of seed.sessionPeople) {
-      exists('sessionPerson.session_id', String(row.session_id));
-      exists('sessionPerson.person_id', String(row.person_id));
-    }
-    for (const row of seed.assignments) exists('assignment.unit_id', String(row.unit_id));
-
-    expect(missing).toEqual([]);
+    expect(problems).toEqual([]);
   });
 
   it('points every user reference at a real user', () => {
@@ -236,15 +269,41 @@ describe('the fixture set', () => {
   });
 
   it('does not move with the clock', () => {
-    /* The visual gate diffs screenshots. A fixture built from `Date.now()` would fail it every
-       midnight, for a reason nobody would attribute to the fixture. */
-    const dates = [
-      ...seed.sessions.map((s) => s.starts_at),
-      ...seed.tenants.flatMap((t) => [t.starts_on, t.ends_on]),
-    ];
-    for (const value of dates) {
-      expect(value).not.toBeNull();
-      expect(String(value)).toMatch(/^20\d\d-/);
+    /*
+     * `^20\\d\\d-` was the first version of this, and it was worth nothing: a value from
+     * `new Date()` matches it, and so did `2026-11-20T10.5:00:00.000Z` — the invalid string a
+     * fractional timezone offset produced, which made every wedding and festival time in this
+     * set unparseable while the test stayed green.
+     *
+     * So: exact values, and a parse. The visual gate diffs screenshots, and a fixture that
+     * moved with the clock would fail it every midnight for a reason nobody would attribute to
+     * the fixture.
+     */
+    const bySlug = new Map(seed.tenants.map((t) => [t.slug, t]));
+    expect(bySlug.get('sanit-riyanks')?.starts_on).toBe('2026-11-20');
+    expect(bySlug.get('devcon-25')?.ends_on).toBe('2026-10-07');
+
+    const byId = new Map(seed.sessions.map((row) => [String(row.id), row]));
+    /* 16:00 in Asia/Kolkata is 10:30Z — the half-hour offset the broken helper could not
+       express, pinned here so it cannot silently become 10:00 or an invalid string again. */
+    expect(byId.get('s_wed_mehendi')?.starts_at).toBe('2026-11-20T10:30:00.000Z');
+    /* 09:30 in Europe/Berlin is 07:30Z, a whole-hour offset for contrast. */
+    expect(byId.get('s_con_keynote')?.starts_at).toBe('2026-10-06T07:30:00.000Z');
+
+    for (const row of seed.sessions) {
+      expect(Number.isNaN(Date.parse(row.starts_at))).toBe(false);
+      if (row.ends_at !== null) expect(Number.isNaN(Date.parse(row.ends_at))).toBe(false);
+    }
+    for (const row of seed.tasks) {
+      if (row.due_at !== null) expect(Number.isNaN(Date.parse(row.due_at))).toBe(false);
+    }
+  });
+
+  it('gives every image a dominant colour to paint before it loads', () => {
+    /* The frame shows this while the blurhash decodes and behind an image that never arrives.
+       Null everywhere would have made that path render the neutral fallback in every fixture. */
+    for (const asset of seed.mediaAssets) {
+      expect(asset.dominant_color).toMatch(/^#[0-9a-f]{6}$/);
     }
   });
 });

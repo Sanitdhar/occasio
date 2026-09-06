@@ -160,13 +160,12 @@ export const CONFERENCE: Partial<MockTables> = {
   tenantConfigs: [CONFERENCE_CONFIG],
   users: [user('paula', 'Paula Brandt'), user('sam', 'Sam Okafor'), user('ines', 'Inês Costa')],
   memberships: [
-    membership(T, ids.user('paula'), 'event_admin'),
-    membership(T, ids.user('sam'), 'crew'),
-    membership(T, ids.user('ines'), 'attendee'),
+    membership(T, 'con_paula', ids.user('paula'), 'event_admin'),
+    membership(T, 'con_sam', ids.user('sam'), 'crew'),
+    membership(T, 'con_ines', ids.user('ines'), 'attendee'),
     /* An invitation that has not been accepted: a row that exists before the person does, and
        the reason `findActiveMembership` checks status rather than presence. */
-    membership(T, ids.user('ines'), 'moderator', 'invited', {
-      user_id: null,
+    membership(T, 'con_invite', null, 'moderator', 'invited', {
       invited_email: 'not-yet@example.test',
       invited_by: ids.user('paula'),
       invited_at: FIXTURE_NOW,
@@ -185,7 +184,13 @@ export const CONFERENCE: Partial<MockTables> = {
     }),
   ],
   mediaAssets: [
-    image(T, 'con_aula', 'The Aula, filling up before the keynote', 'L9C6M-00~q4n?bxu9FRj00~q%MRj'),
+    image(
+      T,
+      'con_aula',
+      'The Aula, filling up before the keynote',
+      'L9C6M-00~q4n?bxu9FRj00~q%MRj',
+      '#2a3f6b',
+    ),
   ],
   personas,
   gossipPosts: [

@@ -81,13 +81,17 @@ export const ids = {
  * and in Lisbon, which is exactly the mistake a hardcoded `Z` timestamp hides.
  */
 export const at = (day: string, hour: number, minute = 0, offsetHours = 0): Timestamptz => {
-  const utcHour = hour - offsetHours;
-  return new Date(`${day}T00:00:00.000Z`)
-    .toISOString()
-    .replace(
-      /T.*/,
-      `T${String(utcHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00.000Z`,
-    );
+  /*
+   * Arithmetic in milliseconds, not string surgery on the hour field.
+   *
+   * The first version subtracted the offset from the hour and formatted the result, which is
+   * fine until the offset is not a whole number: India is +5:30, so 16:00 became
+   * `T10.5:00:00.000Z` — a string that looks like a timestamp, parses as `Invalid Date`, and
+   * had made every wedding and festival time in this fixture set invalid. Milliseconds carry
+   * the half hour without anyone having to remember it exists.
+   */
+  const localMs = Date.parse(`${day}T00:00:00.000Z`) + (hour * 60 + minute) * 60_000;
+  return new Date(localMs - offsetHours * 3_600_000).toISOString();
 };
 
 export const user = (name: string, displayName: string, over: Partial<UserRow> = {}): UserRow => ({
@@ -103,12 +107,21 @@ export const user = (name: string, displayName: string, over: Partial<UserRow> =
 
 export const membership = (
   tenant: TenantId,
-  who: UserId,
+  /**
+   * The row's own name, not the member's.
+   *
+   * Deriving the id from `user_id` collided the moment a tenant had both an active membership
+   * for someone and an unaccepted invitation from them, because an invitation's `user_id` is
+   * null and both rows landed on the same id. An id that depends on another column changes
+   * meaning when that column does.
+   */
+  key: string,
+  who: UserId | null,
   role: MembershipRole,
   status: MembershipStatus = 'active',
   over: Partial<MembershipRow> = {},
 ): MembershipRow => ({
-  id: membershipId(`mb_${String(tenant)}_${String(who)}`),
+  id: membershipId(`mb_${key}`),
   tenant_id: tenant,
   user_id: who,
   invited_email: null,
@@ -213,6 +226,8 @@ export const image = (
   name: string,
   alt: string,
   blurhash: string,
+  /** The colour a frame paints before the blurhash decodes, and behind an image that fails. */
+  dominantColor: string,
   over: Partial<MediaAssetRow> = {},
 ): MediaAssetRow => ({
   id: ids.media(name),
@@ -223,7 +238,7 @@ export const image = (
   width: 1600,
   height: 1067,
   blurhash,
-  dominant_color: null,
+  dominant_color: dominantColor,
   alt,
   byte_size: 384_000,
   uploaded_by: null,

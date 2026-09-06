@@ -139,9 +139,9 @@ export const FESTIVAL: Partial<MockTables> = {
   tenantConfigs: [FESTIVAL_CONFIG],
   users: [user('devi', 'Devi Menon'), user('rafi', 'Rafi Ahmed'), user('lena', 'Lena Fischer')],
   memberships: [
-    membership(T, ids.user('devi'), 'event_admin'),
-    membership(T, ids.user('rafi'), 'crew'),
-    membership(T, ids.user('lena'), 'attendee'),
+    membership(T, 'fes_devi', ids.user('devi'), 'event_admin'),
+    membership(T, 'fes_rafi', ids.user('rafi'), 'crew'),
+    membership(T, 'fes_lena', ids.user('lena'), 'attendee'),
   ],
   venues: stages,
   sessions,
@@ -152,8 +152,14 @@ export const FESTIVAL: Partial<MockTables> = {
     sessionPerson(T, ids.session('fes_ruhi'), ids.person('fes_ruhi')),
   ],
   mediaAssets: [
-    image(T, 'fes_main', 'The mainstage crowd at dusk', 'L36@#=~q00Rj4nWBofof00Rj~qxu'),
-    image(T, 'fes_grove', 'Strings of lights through trees', 'LBB|WA~q00%M9FIU%MRj00IU~q4n'),
+    image(T, 'fes_main', 'The mainstage crowd at dusk', 'L36@#=~q00Rj4nWBofof00Rj~qxu', '#1b3b33'),
+    image(
+      T,
+      'fes_grove',
+      'Strings of lights through trees',
+      'LBB|WA~q00%M9FIU%MRj00IU~q4n',
+      '#26483f',
+    ),
   ],
   personas,
   gossipPosts: [

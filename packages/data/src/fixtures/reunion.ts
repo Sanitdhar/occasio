@@ -91,8 +91,8 @@ export const REUNION: Partial<MockTables> = {
   tenantConfigs: [REUNION_CONFIG],
   users: [user('harriet', 'Harriet Bell'), user('george', 'George Amankwah')],
   memberships: [
-    membership(T, ids.user('harriet'), 'event_admin'),
-    membership(T, ids.user('george'), 'attendee'),
+    membership(T, 'reu_harriet', ids.user('harriet'), 'event_admin'),
+    membership(T, 'reu_george', ids.user('george'), 'attendee'),
   ],
   venues: [
     venue(T, 'reu_hall', 'The Old Assembly Hall', {
@@ -126,7 +126,13 @@ export const REUNION: Partial<MockTables> = {
   ],
   sessionPeople: [],
   mediaAssets: [
-    image(T, 'reu_hall', 'The assembly hall, set for dinner', 'LEHV6nWB2yk8pyoJadR*.7kCMdnj'),
+    image(
+      T,
+      'reu_hall',
+      'The assembly hall, set for dinner',
+      'LEHV6nWB2yk8pyoJadR*.7kCMdnj',
+      '#6b4636',
+    ),
   ],
   /* Empty on purpose: the board is off for this tenant, and a screen that assumed at least one
      persona would break on the first event that turned gossips off. */

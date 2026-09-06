@@ -110,13 +110,20 @@ const venues = [
 ];
 
 const media = [
-  image(T, 'wed_hero', 'The couple under the mandap at dusk', 'LKO2?U%2Tw=w]~RBVZRi};RPxuwH'),
-  image(T, 'wed_mehendi', 'Hands painted with mehendi', 'LEHV6nWB2yk8pyo0adR*.7kCMdnj'),
+  image(
+    T,
+    'wed_hero',
+    'The couple under the mandap at dusk',
+    'LKO2?U%2Tw=w]~RBVZRi};RPxuwH',
+    '#7a4a5c',
+  ),
+  image(T, 'wed_mehendi', 'Hands painted with mehendi', 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', '#8b6f47'),
   image(
     T,
     'wed_sangeet',
     'The family mid-dance under string lights',
     'L6PZfSi_.AyE_3t7t7R**0o#DgR4',
+    '#3d2b36',
   ),
 ];
 
@@ -228,11 +235,11 @@ export const WEDDING: Partial<MockTables> = {
   tenantConfigs: [WEDDING_CONFIG],
   users,
   memberships: [
-    membership(T, ids.user('sanit'), 'event_admin'),
-    membership(T, ids.user('riya'), 'event_admin'),
-    membership(T, ids.user('meera'), 'moderator'),
-    membership(T, ids.user('arjun'), 'crew'),
-    membership(T, ids.user('nisha'), 'attendee'),
+    membership(T, 'wed_sanit', ids.user('sanit'), 'event_admin'),
+    membership(T, 'wed_riya', ids.user('riya'), 'event_admin'),
+    membership(T, 'wed_meera', ids.user('meera'), 'moderator'),
+    membership(T, 'wed_arjun', ids.user('arjun'), 'crew'),
+    membership(T, 'wed_nisha', ids.user('nisha'), 'attendee'),
   ],
   venues,
   sessions,
