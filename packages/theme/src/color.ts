@@ -168,3 +168,12 @@ export const hueOf = (color: string): number => toOklch(color).h;
 
 /** Chroma, used to tell the admin when their seed was pulled into a usable range. */
 export const chromaOf = (color: string): number => toOklch(color).c;
+
+/**
+ * Perceptual lightness, 0 to 1.
+ *
+ * Signed comparisons need this because `contrast` is symmetric: `contrast(a, b)` cannot say
+ * which of the two is lighter, so a test built on it alone will accept a pair whose roles have
+ * been swapped, and accept a hover that darkens beside a press that lightens.
+ */
+export const lightnessOf = (color: string): number => toOklch(color).l;

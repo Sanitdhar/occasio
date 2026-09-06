@@ -1,4 +1,10 @@
-import { PRESET_IDS, contrast, resolveTheme, themeInputFromPreset } from '@occasio/theme';
+import {
+  PRESET_IDS,
+  contrast,
+  lightnessOf,
+  resolveTheme,
+  themeInputFromPreset,
+} from '@occasio/theme';
 import type { ResolvedTheme, Scheme } from '@occasio/theme';
 import { describe, expect, it } from '@jest/globals';
 import { interactiveFill, type PressState } from './interaction';
@@ -10,6 +16,7 @@ import {
   surfaceBackground,
   surfacePalette,
   tonalPalette,
+  type SurfaceTone,
 } from './tones';
 
 /**
@@ -101,19 +108,59 @@ describe('space scale', () => {
 });
 
 describe('surface tones', () => {
-  it('separate by lightness, with no shadow to fall back on', () => {
+  it('separate by lightness, in one direction, with no shadow to fall back on', () => {
+    /*
+     * Signed lightness rather than `contrast`, which is symmetric: `contrast(a, b)` cannot say
+     * which of two colours is lighter, so a version of this test built on it alone passed when
+     * `sunken` and `raised` swapped roles. The elevation ramp is an ordering, and an ordering
+     * needs a direction.
+     */
     const failures = sweep((theme) => {
-      const sunken = surfaceBackground(theme, 'sunken');
-      const base = surfaceBackground(theme, 'base');
-      const raised = surfaceBackground(theme, 'raised');
+      const sunken = lightnessOf(surfaceBackground(theme, 'sunken'));
+      const base = lightnessOf(surfaceBackground(theme, 'base'));
+      const raised = lightnessOf(surfaceBackground(theme, 'raised'));
 
       const problems: string[] = [];
-      if (contrast(base, sunken) <= 1) {
-        problems.push(`base is not above sunken (${base} on ${sunken})`);
+      /* Raised is further from the page than base, and base further than sunken — measured
+         along whichever direction this scheme elevates in, which is up in light and up in dark
+         but is not assumed either way. */
+      const direction = Math.sign(raised - sunken);
+      if (direction === 0) problems.push('sunken and raised are the same lightness');
+      if (Math.sign(base - sunken) !== direction) {
+        problems.push(
+          `base is not between sunken and raised (${String(sunken)} / ${String(base)} / ${String(raised)})`,
+        );
       }
-      const step = contrast(raised, base);
+      if (Math.sign(raised - base) !== direction) {
+        problems.push(`raised does not continue past base (${String(base)} / ${String(raised)})`);
+      }
+
+      const step = contrast(surfaceBackground(theme, 'raised'), surfaceBackground(theme, 'base'));
       if (step < PERCEPTIBLE) problems.push(`raised/base step only ${step.toFixed(3)}`);
       return problems;
+    });
+
+    expect(failures).toEqual([]);
+  });
+
+  it('elevates away from the page, whichever way that is for the scheme', () => {
+    /*
+     * The direction is not the same in both schemes and should not be: light elevates darker
+     * (0.989 sunken to 0.951 raised) and dark elevates lighter (0.170 to 0.245). Asserting one
+     * fixed direction fails on half the themes — I tried, and the measurement is what corrected
+     * it. What holds everywhere is the reason behind both: elevation moves *away* from the page
+     * background, so a raised card separates from it more than a sunken well does.
+     */
+    const failures = sweep((theme) => {
+      const page = lightnessOf(theme.color.bg);
+      const from = (tone: SurfaceTone): number =>
+        Math.abs(lightnessOf(surfaceBackground(theme, tone)) - page);
+
+      return from('raised') > from('base') && from('base') >= from('sunken')
+        ? []
+        : [
+            `elevation does not move away from the page (sunken ${from('sunken').toFixed(4)}, base ${from('base').toFixed(4)}, raised ${from('raised').toFixed(4)})`,
+          ];
     });
 
     expect(failures).toEqual([]);
@@ -222,23 +269,34 @@ describe('interactive fill', () => {
     const failures = sweep((theme) =>
       TONAL_TONES.flatMap((tone) => {
         const palette = tonalPalette(theme, tone);
+        const resting = lightnessOf(palette.background);
+        /*
+         * Signed deltas, not `contrast`. Contrast is symmetric, so measuring the shift with it
+         * says how far the fill moved and not which way — and "the same direction" was the
+         * whole claim. A box darkening on hover and lightening on press passed the previous
+         * version of this test, which is precisely the thing `fillDirection` exists to prevent.
+         */
+        const hoverDelta =
+          lightnessOf(interactiveFill(theme, palette, state({ hovered: true }))) - resting;
+        const pressDelta =
+          lightnessOf(interactiveFill(theme, palette, state({ pressed: true }))) - resting;
+
+        const problems: string[] = [];
         const hoverShift = contrast(
           interactiveFill(theme, palette, state({ hovered: true })),
           palette.background,
         );
-        const pressShift = contrast(
-          interactiveFill(theme, palette, state({ pressed: true })),
-          palette.background,
-        );
-
-        const problems: string[] = [];
         if (hoverShift <= 1.02)
           problems.push(`${tone} hover is invisible (${hoverShift.toFixed(3)})`);
-        /* Same direction, further along it. Choosing the direction per state is how a box ends
-           up darkening on hover and lightening on press. */
-        if (pressShift <= hoverShift) {
+        if (Math.sign(hoverDelta) !== Math.sign(pressDelta)) {
           problems.push(
-            `${tone} press (${pressShift.toFixed(3)}) does not go beyond hover (${hoverShift.toFixed(3)})`,
+            `${tone} hover (${hoverDelta.toFixed(4)}) and press (${pressDelta.toFixed(4)}) move in opposite directions`,
+          );
+        }
+        /* Same direction, further along it. */
+        if (Math.abs(pressDelta) <= Math.abs(hoverDelta)) {
+          problems.push(
+            `${tone} press (${pressDelta.toFixed(4)}) does not go beyond hover (${hoverDelta.toFixed(4)})`,
           );
         }
         return problems;

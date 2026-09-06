@@ -38,15 +38,8 @@ const useChipStyles = createStyles((t) => ({
   label: { ...t.type.caption, flexShrink: 1 },
 }));
 
-export type ChipProps = {
+type ChipBase = {
   readonly tone?: TonalTone | undefined;
-  /**
-   * Present only on a chip that toggles. Left out — not set to `false` — on a plain tag, which
-   * is what tells the chip whether it is a checkbox or a button, and stops every filter chip
-   * announcing "not selected".
-   */
-  readonly selected?: boolean | undefined;
-  readonly onPress?: (() => void) | undefined;
   readonly disabled?: boolean | undefined;
   readonly leading?: ReactNode;
   readonly trailing?: ReactNode;
@@ -55,6 +48,30 @@ export type ChipProps = {
   /** The label. Screen readers get it in full even when it is visually truncated. */
   readonly children: string;
 };
+
+/**
+ * A chip is one of two things, and the type makes you say which.
+ *
+ * `selected` on its own used to compile, and painted the selected palette while rendering
+ * without `role="checkbox"` or `aria-checked` — the state visible to anyone who can see the
+ * colour and invisible to anyone who cannot. A selected state nobody can toggle is also not a
+ * state, it is a colour, and a tag wanting the brand colour should ask for the tone.
+ */
+export type ChipProps =
+  | (ChipBase & {
+      /**
+       * Present only on a chip that toggles, which is why it brings `onPress` with it. Left out
+       * — not set to `false` — on a plain tag, so that every filter chip does not announce
+       * "not selected".
+       */
+      readonly selected: boolean;
+      readonly onPress: () => void;
+    })
+  | (ChipBase & {
+      readonly selected?: undefined;
+      /** A chip that acts without toggling: a dismissable filter, a link. */
+      readonly onPress?: (() => void) | undefined;
+    });
 
 export function Chip({
   tone = 'neutral',
@@ -73,8 +90,12 @@ export function Chip({
 
   /* A chip that toggles is a checkbox, not a button: `aria-selected` is only valid on options
      and tabs, so a screen reader would ignore it on a button. `aria-checked` is valid here, is
-     forwarded by react-native-web, and React Native maps it to the native checked state. */
-  const togglable = onPress !== undefined && selected !== undefined;
+     forwarded by react-native-web, and React Native maps it to the native checked state.
+
+     `selected` is enough on its own now — the prop types will not let it arrive without an
+     `onPress`, so this no longer has to defend against the combination that produced a
+     silently unannounced selected state. */
+  const togglable = selected !== undefined;
 
   return (
     <InteractiveBox

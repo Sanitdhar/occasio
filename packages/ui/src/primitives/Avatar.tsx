@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import type { ReactElement } from 'react';
 import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import type { ImageProps } from '../media/Image';
 import { createStyles } from '../theme/createStyles';
 import { useTheme } from '../theme/useTheme';
 import { initialsFrom } from './initials';
@@ -70,8 +71,15 @@ export type AvatarProps = {
   readonly name: string;
   readonly size?: AvatarSize | undefined;
   readonly tone?: TonalTone | undefined;
-  /** An image element, clipped to the circle. Nothing is rendered behind it. */
-  readonly children?: ReactNode;
+  /**
+   * The avatar's photograph, clipped to the circle. Nothing is rendered behind it.
+   *
+   * Typed as an `<Image>` element rather than a bare `ReactNode`, because `ReactNode` accepted
+   * react-native's `Image` — the one this package bans — and with it a photograph that shows a
+   * spinner instead of a blurhash and has no alternative text. The wrapper already requires
+   * both; this is what makes a caller go through it.
+   */
+  readonly children?: ReactElement<ImageProps> | undefined;
   readonly style?: StyleProp<ViewStyle> | undefined;
   readonly testID?: string | undefined;
 };

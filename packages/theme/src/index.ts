@@ -2,6 +2,7 @@ export {
   buildNeutralRamp,
   buildRamp,
   chromaOf,
+  lightnessOf,
   contrast,
   ensureContrast,
   hueOf,
