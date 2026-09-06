@@ -13,9 +13,10 @@ export type ComparedFile = {
   /** Set by GitHub only for a rename; the path the file came from. */
   readonly previous_filename?: string | undefined;
   readonly status?: string | undefined;
-  readonly patch?: string | undefined;
-  readonly sha?: string | undefined;
+  readonly patch?: string | null | undefined;
+  readonly sha?: string | null | undefined;
 };
 
 export declare const COMPARE_FILE_CAP: number;
+export declare const isDescribable: (file: ComparedFile) => boolean;
 export declare const diffFingerprint: (files: readonly ComparedFile[]) => string;

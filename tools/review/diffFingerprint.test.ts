@@ -1,5 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
-import { COMPARE_FILE_CAP, diffFingerprint, type ComparedFile } from './diffFingerprint.mjs';
+import {
+  COMPARE_FILE_CAP,
+  diffFingerprint,
+  isDescribable,
+  type ComparedFile,
+} from './diffFingerprint.mjs';
 
 /**
  * The rule this encodes: a rebase is not a change, and everything else is.
@@ -98,5 +103,31 @@ describe('diffFingerprint', () => {
   it('reports an empty comparison distinctly from a one-file one', () => {
     expect(diffFingerprint([])).toBe('');
     expect(diffFingerprint([file()])).not.toBe('');
+  });
+});
+
+describe('isDescribable', () => {
+  it('accepts a file with a patch, or with only a blob sha', () => {
+    expect(isDescribable({ patch: '@@ -1 +1 @@' })).toBe(true);
+    expect(isDescribable({ sha: 'abc123' })).toBe(true);
+  });
+
+  it('rejects a file with neither', () => {
+    /* Two of these fingerprint identically as `binary:unknown`, which would read as "nothing
+       changed since the review". */
+    expect(isDescribable({})).toBe(false);
+  });
+
+  it('treats null the same as absent', () => {
+    /* These arrive as JSON, where an absent field is often an explicit null. The first version
+       of this guard compared against `undefined` only and let both nulls through. */
+    expect(isDescribable({ patch: null, sha: null })).toBe(false);
+    expect(isDescribable({ patch: null, sha: 'abc123' })).toBe(true);
+    expect(isDescribable({ patch: '@@ -1 +1 @@', sha: null })).toBe(true);
+  });
+
+  it('accepts an empty patch, which is a real value', () => {
+    /* A pure rename has an empty patch rather than no patch, and it is describable. */
+    expect(isDescribable({ patch: '' })).toBe(true);
   });
 });

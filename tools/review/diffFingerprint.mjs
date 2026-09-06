@@ -19,6 +19,22 @@
 export const COMPARE_FILE_CAP = 300;
 
 /**
+ * Whether a file carries enough to tell one version of it from another.
+ *
+ * A file with neither a patch nor a blob sha serialises to `binary:unknown`, and so does every
+ * other such file — one unknown matching another, in the function whose answer decides whether
+ * a review can be skipped. `null` counts as absent as well as `undefined`, because these values
+ * come off the wire as JSON and a null is what an absent field often arrives as.
+ *
+ * Exported and tested rather than inlined at the call site: the first version of this guard was
+ * written inline against `undefined` only, and nothing could have caught that it missed `null`.
+ *
+ * @param {{ patch?: string | null, sha?: string | null }} file
+ * @returns {boolean}
+ */
+export const isDescribable = (file) => (file.patch ?? file.sha ?? null) !== null;
+
+/**
  * @param {{ filename?: string, previous_filename?: string, patch?: string, sha?: string, status?: string }[]} files
  * @returns {string}
  */

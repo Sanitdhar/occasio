@@ -16,7 +16,7 @@
  *   requests also work, at a lower rate limit.
  */
 import { readFileSync } from 'node:fs';
-import { COMPARE_FILE_CAP, diffFingerprint } from './diffFingerprint.mjs';
+import { COMPARE_FILE_CAP, diffFingerprint, isDescribable } from './diffFingerprint.mjs';
 
 /**
  * Exact logins, not a substring match.
@@ -178,7 +178,7 @@ const effectiveDiff = async (sha) => {
     if (files.length >= COMPARE_FILE_CAP) return null;
     /* A file with neither a patch nor a blob sha is a file this cannot describe. Both would
        serialise as `binary:unknown`, which is one unknown matching another. */
-    if (files.some((f) => f.patch === undefined && f.sha === undefined)) return null;
+    if (!files.every(isDescribable)) return null;
     return diffFingerprint(files);
   } catch {
     /* A force-pushed commit can fall out of reach. Unknown is not "unchanged". */
