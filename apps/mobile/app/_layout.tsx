@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppAdapterProvider } from '../src/data/AppAdapterProvider';
 import { ErrorFallback } from '../src/features/errors/ErrorFallback';
+import { AppAuthProvider } from '../src/auth/AppAuthProvider';
 import { TenantProvider } from '../src/tenant/TenantProvider';
 import { AppThemeProvider } from '../src/theme/AppThemeProvider';
 import { APP_THEME } from '../src/theme/inputs';
@@ -65,18 +66,20 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <AppAdapterProvider>
-          {/* No slug: the root is where the platform gets asked, once. Inside /e/[slug] the
+        <AppAuthProvider>
+          <AppAdapterProvider>
+            {/* No slug: the root is where the platform gets asked, once. Inside /e/[slug] the
               route already knows, and its own provider says so rather than resolving again. */}
-          <TenantProvider>
-            <AppThemeProvider input={APP_THEME}>
-              <SafeAreaProvider>
-                <StatusBar style="auto" />
-                <Stack screenOptions={{ headerShown: false }} />
-              </SafeAreaProvider>
-            </AppThemeProvider>
-          </TenantProvider>
-        </AppAdapterProvider>
+            <TenantProvider>
+              <AppThemeProvider input={APP_THEME}>
+                <SafeAreaProvider>
+                  <StatusBar style="auto" />
+                  <Stack screenOptions={{ headerShown: false }} />
+                </SafeAreaProvider>
+              </AppThemeProvider>
+            </TenantProvider>
+          </AppAdapterProvider>
+        </AppAuthProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
   );
