@@ -26,22 +26,29 @@ describe('fieldMessage', () => {
     expect(fieldMessage(undefined, undefined).text).toBeNull();
   });
 
-  it('treats an empty error as invalid with no message', () => {
+  it('treats an empty error as invalid, and still withholds the hint', () => {
     /*
      * What a validator produces when it knows the field is wrong and has nothing printable to
-     * say — a required field left blank on submit. Treating it as "no error" shows the hint
-     * under a field the form will refuse, and tells a screen reader the field is fine.
+     * say — a required field left blank on submit. It is invalid, and the hint does not come
+     * back: "Optional" under a field the form is refusing is worse than silence, because it is
+     * advice contradicting what just happened.
      */
     const state = fieldMessage('Optional', '');
 
     expect(state.invalid).toBe(true);
-    expect(state.text).toBe('Optional');
-    expect(state.tone).toBe('hint');
+    expect(state.text).toBeNull();
+    expect(state.tone).toBe('error');
   });
 
-  it('ignores whitespace that is not a message', () => {
-    /* `error={serverError}` where the server sent `"  "` is not an error anyone can read. */
-    expect(fieldMessage('A hint', '   ').text).toBe('A hint');
+  it('treats a whitespace error the same way', () => {
+    /* `error={serverError}` where the server sent `"  "` is not readable and is still not ok. */
+    const state = fieldMessage('A hint', '   ');
+
+    expect(state.invalid).toBe(true);
+    expect(state.text).toBeNull();
+  });
+
+  it('ignores whitespace that is not a hint', () => {
     expect(fieldMessage('   ', null).text).toBeNull();
   });
 });

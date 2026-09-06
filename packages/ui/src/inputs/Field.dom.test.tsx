@@ -36,9 +36,13 @@ describe('Field', () => {
   it('describes the input by its hint', () => {
     renderField({ hint: 'We only use this for the seating plan' });
 
+    /* The relationship, not merely that an id is present: a non-empty id pointing at something
+       else reads as a description while describing nothing. */
     const described = input().getAttribute('aria-describedby');
+    const message = screen.getByText('We only use this for the seating plan');
+
+    expect(described).toBe(message.getAttribute('id'));
     expect(described).toBeTruthy();
-    expect(screen.getByText('We only use this for the seating plan')).toBeTruthy();
   });
 
   it('points at nothing when there is no message', () => {
@@ -51,18 +55,22 @@ describe('Field', () => {
 
   it('announces invalid, and replaces the hint with the error', () => {
     renderField({ hint: 'Any format is fine', error: 'That is not an email address' });
+    const message = screen.getByText('That is not an email address');
 
     expect(input().getAttribute('aria-invalid')).toBe('true');
-    expect(screen.getByText('That is not an email address')).toBeTruthy();
+    expect(input().getAttribute('aria-describedby')).toBe(message.getAttribute('id'));
     expect(screen.queryByText('Any format is fine')).toBeNull();
   });
 
   it('announces invalid even when there is no message to read', () => {
     /* A required field left blank on submit: the validator knows it is wrong and has nothing
        printable to say. Reading as valid there is the failure. */
-    renderField({ error: '' });
+    renderField({ hint: 'Optional', error: '' });
 
     expect(input().getAttribute('aria-invalid')).toBe('true');
+    /* And the hint does not come back to fill the silence. */
+    expect(screen.queryByText('Optional')).toBeNull();
+    expect(input().getAttribute('aria-describedby')).toBeNull();
   });
 
   it('does not announce a valid field as invalid', () => {

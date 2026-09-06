@@ -94,6 +94,9 @@ export function Sheet({ visible, onDismiss, label, children, testID }: Props) {
              user leaves a dialog with its own affordance, not by tapping the page behind it. */
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
+          /* react-native-web gives an enabled Pressable `tabIndex={0}`, so without this the
+             first Tab inside a sheet lands on an invisible element that announces nothing. */
+          tabIndex={-1}
           style={styles.backdrop}
           onPress={onDismiss}
         />
@@ -102,6 +105,14 @@ export function Sheet({ visible, onDismiss, label, children, testID }: Props) {
           role="dialog"
           aria-modal
           aria-label={label}
+          /*
+           * `accessible` is what makes `onAccessibilityEscape` reachable: it is the VoiceOver
+           * two-finger scrub, and without it an iOS user whose sheet has no visible close
+           * control is stuck inside it. The backdrop cannot rescue them -- it is deliberately
+           * hidden from the accessibility tree.
+           */
+          accessible
+          onAccessibilityEscape={onDismiss}
           style={[styles.panel, toElevationStyle(theme.elevation.lg)]}
         >
           <View aria-hidden style={styles.handle} />

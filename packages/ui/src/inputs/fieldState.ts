@@ -31,18 +31,16 @@ export const fieldMessage = (
   if (trimmedError !== '') return { text: trimmedError, tone: 'error', invalid: true };
 
   /*
-   * An empty-string error still means invalid. `error=""` is what a validator produces when it
-   * knows the field is wrong and has nothing printable to say, and treating it as "no error"
-   * shows the hint under a field the form will refuse to submit.
+   * An unprintable error is still an error. `error=""` is what a validator produces when it
+   * knows the field is wrong and has nothing to say about it, and the hint does not come back:
+   * "Optional" under a field the form is refusing is worse than silence, because it is advice
+   * that contradicts what just happened.
    */
   const invalid = error !== null && error !== undefined;
-  const trimmedHint = hint?.trim() ?? '';
+  if (invalid) return { text: null, tone: 'error', invalid: true };
 
-  return {
-    text: trimmedHint === '' ? null : trimmedHint,
-    tone: 'hint',
-    invalid,
-  };
+  const trimmedHint = hint?.trim() ?? '';
+  return { text: trimmedHint === '' ? null : trimmedHint, tone: 'hint', invalid: false };
 };
 
 /**
