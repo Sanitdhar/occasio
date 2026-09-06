@@ -44,6 +44,14 @@ export type BoxAccessibilityProps = {
   readonly 'aria-label'?: string | undefined;
   /** For a chip that toggles. Left undefined by anything that is not a toggle. */
   readonly 'aria-checked'?: boolean | undefined;
+  /**
+   * Whether Tab stops here. Left undefined by everything that is one Tab stop on its own.
+   *
+   * It exists for the composites that are a single stop made of several boxes — a radio group
+   * is entered once and traversed with the arrow keys — where react-native-web's default of
+   * `tabIndex={0}` on every enabled Pressable would instead make each option its own stop.
+   */
+  readonly tabIndex?: 0 | -1 | undefined;
 };
 
 export type InteractiveBoxProps = BoxAccessibilityProps & {
@@ -65,6 +73,7 @@ export function InteractiveBox({
   role,
   'aria-label': ariaLabel,
   'aria-checked': ariaChecked,
+  tabIndex,
   testID,
   style,
   children,
@@ -84,6 +93,7 @@ export function InteractiveBox({
         aria-label={ariaLabel}
         aria-checked={ariaChecked}
         aria-disabled={ariaDisabled}
+        tabIndex={tabIndex}
         testID={testID}
         /* A box with no onPress still honours `disabled`: a chip that reads as available but
            silently does nothing is worse than one that looks switched off. */
@@ -100,6 +110,7 @@ export function InteractiveBox({
       aria-label={ariaLabel}
       aria-checked={ariaChecked}
       aria-disabled={ariaDisabled}
+      tabIndex={tabIndex}
       testID={testID}
       onPress={onPress}
       disabled={disabled}
