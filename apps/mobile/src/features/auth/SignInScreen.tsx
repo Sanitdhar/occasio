@@ -26,8 +26,6 @@ export type SignInScreenProps = {
   readonly busy?: boolean | undefined;
   /** Shown under the button. Absent while nothing has gone wrong. */
   readonly error?: string | undefined;
-  /** Names the event somebody was heading for, when there is one. */
-  readonly destination?: string | undefined;
   /**
    * Whether signing in is the mock rather than a real provider.
    *
@@ -43,23 +41,23 @@ const useStyles = createStyles((t) => ({
   actions: { gap: t.space(2), marginTop: t.space(4) },
 }));
 
-export function SignInScreen({
-  onSignIn,
-  busy = false,
-  error,
-  destination,
-  demo = false,
-}: SignInScreenProps) {
+export function SignInScreen({ onSignIn, busy = false, error, demo = false }: SignInScreenProps) {
   const styles = useStyles();
 
   return (
     <Screen testID="sign-in-screen">
       <View style={styles.root}>
         <Text variant="display2">Sign in</Text>
+        {/*
+          No "sign in to open <event>" line, and it is a deliberate removal rather than an
+          omission. The only thing this screen holds is the *path* somebody was heading for, and
+          "Sign in to open /e/lila-and-sam/schedule" is worse prose than saying nothing. Naming
+          the event needs a tenant lookup, and a sign-in screen that fetches an event before
+          anyone is signed in is a screen doing somebody else's job. If the named version is
+          wanted, it arrives with that lookup rather than with a URL dressed up as a name.
+        */}
         <Text tone="muted">
-          {destination === undefined
-            ? 'Signing in is how the app knows which tasks and reminders are yours.'
-            : `Sign in to open ${destination}. It is how the app knows which tasks and reminders are yours.`}
+          Signing in is how the app knows which tasks and reminders are yours.
         </Text>
 
         <View style={styles.actions}>

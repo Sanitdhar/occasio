@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
 import { safeNext } from '../../auth/nextRoute';
 
@@ -34,6 +34,19 @@ export const useSignInFlow = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
+  /*
+   * One completion handler per attempt.
+   *
+   * `signIn` is single-flight, so a second `start` does not begin a second sign-in — but it does
+   * attach a second `.then`, and both would call `onSignedIn`. That is two navigations for one
+   * sign-in, which on a stack is a duplicate route and on the web is a history entry somebody
+   * has to press back through twice.
+   *
+   * A ref rather than the `busy` state: `busy` is set for the next render, and both calls happen
+   * before it.
+   */
+  const handling = useRef(false);
+
   /* Checked here rather than at the point of navigation, so there is one place that decides what
      an acceptable destination is — see nextRoute.ts for why an unchecked one is an open
      redirect rather than a convenience. */
@@ -46,6 +59,8 @@ export const useSignInFlow = ({
     error,
     demo,
     start: () => {
+      if (handling.current) return;
+      handling.current = true;
       setBusy(true);
       setError(undefined);
 
@@ -59,6 +74,7 @@ export const useSignInFlow = ({
           setError('Could not sign in. Please try again.');
         })
         .finally(() => {
+          handling.current = false;
           setBusy(false);
         });
     },

@@ -64,14 +64,6 @@ describe('SignInScreen', () => {
     expect(onSignIn).not.toHaveBeenCalled();
   });
 
-  it('says what somebody was heading for, when there is one', () => {
-    /* "Sign in to open Lila & Sam" explains why a stranger is being asked for an account, which
-       "Sign in" on its own does not. */
-    renderSignIn({ destination: 'Lila & Sam' });
-
-    expect(screen.getByText(/Lila & Sam/)).toBeTruthy();
-  });
-
   it('announces a failure rather than only colouring it', () => {
     /* `Text` has no danger tone — the resolver guarantees contrast for content colours and a
        solid `danger` fill is not one — so the role is what makes this an error at all. */
