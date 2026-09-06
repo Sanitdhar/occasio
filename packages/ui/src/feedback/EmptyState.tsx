@@ -29,6 +29,15 @@ type Props = {
   readonly message?: string | undefined;
   /** The one thing to do about it. Omitted when there genuinely is nothing to do. */
   readonly action?: ReactNode;
+  /**
+   * Where the title sits in the page's heading outline.
+   *
+   * Defaults to 2, because an empty state is the state of one section of a screen that already
+   * has a heading of its own. It has to be written down rather than left off: react-native-web
+   * renders `role="heading"` with no level as an `<h1>`, so the default of doing nothing is a
+   * second top-level heading on the page and an outline that reads as two documents.
+   */
+  readonly headingLevel?: 2 | 3 | 4;
   readonly style?: StyleProp<ViewStyle> | undefined;
 };
 
@@ -47,7 +56,14 @@ const useStyles = createStyles((t) => ({
   action: { marginTop: t.space(2) },
 }));
 
-export function EmptyState({ illustration, title, message, action, style }: Props) {
+export function EmptyState({
+  illustration,
+  title,
+  message,
+  action,
+  headingLevel = 2,
+  style,
+}: Props) {
   const styles = useStyles();
 
   return (
@@ -55,15 +71,19 @@ export function EmptyState({ illustration, title, message, action, style }: Prop
       {illustration === undefined ? null : (
         /* `aria-hidden` covers all three platforms on its own: React Native expands it to
            `accessibilityElementsHidden` for iOS and `importantForAccessibility` for Android,
-           and react-native-web forwards it to the DOM attribute — which the
-           `accessibility*` spellings never reach. */
+           and react-native-web forwards it to the DOM attribute. The `accessibility*` spellings
+           still reach the DOM in react-native-web 0.21.2, but only through a deprecated
+           fallback that warns once per prop — this is the spelling that is not on its way out. */
         <View aria-hidden>{illustration}</View>
       )}
       {/* A heading rather than plain text: it is how a screen reader user skims to "what is
           this screen showing me", which for an empty list is the only content there is.
           `role="heading"` for the same reason as `aria-hidden` above — React Native maps it to
-          the `header` role, react-native-web forwards it, and neither warns. */}
-      <Text role="heading" style={styles.title}>
+          the `header` role, react-native-web forwards it, and neither warns.
+
+          The level is never left implicit: react-native-web picks the element from it
+          (`propsToAccessibilityComponent`), and with no level at all it picks `<h1>`. */}
+      <Text role="heading" aria-level={headingLevel} style={styles.title}>
         {title}
       </Text>
       {message === undefined ? null : <Text style={styles.message}>{message}</Text>}
