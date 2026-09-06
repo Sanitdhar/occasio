@@ -4,7 +4,7 @@ import { FIXTURE_SEED } from './fixtures/index';
 import { isForbiddenError, isNotFoundError, isValidationError } from './errors';
 import { createMockAdapter } from './mock/adapter';
 import { createMemoryStorage } from './mock/storage';
-import type { Cursor } from './pagination';
+import { MAX_PAGE_SIZE, type Cursor } from './pagination';
 import type { DataAdapter } from './repositories';
 
 /**
@@ -84,6 +84,10 @@ const rejectsWith = async (
   throw new Error(`expected ${expected}, but the call resolved`);
 };
 
+const ANY_STATUS = {
+  statuses: ['pending', 'approved', 'rejected', 'hidden'],
+} as const;
+
 const EVERY_SESSION = { statuses: ['draft', 'published', 'cancelled'], track: null } as const;
 const PUBLISHED = { statuses: ['published'], track: null } as const;
 
@@ -146,6 +150,30 @@ describe.each(SUBJECTS)('$name adapter', ({ create }: Subject) => {
          rejected -- the opposite decision from zero, and both are part of the contract. */
       const huge = await adapter.sessions.list(WEDDING, EVERY_SESSION, { limit: 10_000 });
       expect(huge.items.length).toBeGreaterThan(0);
+      expect(huge.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
+    });
+
+    it('clamps to the maximum page rather than returning everything', async () => {
+      /*
+       * The fixture has five sessions, so the case above cannot tell clamping from obedience --
+       * both return five. This one writes past the cap first, which is the only way the
+       * boundary is observable at all.
+       *
+       * Gossip rather than sessions because it is the collection an adapter can be asked to
+       * grow through its own interface, which keeps this from reaching for the mock's seed.
+       */
+      const adapter = await create(WEDDING_ADMIN);
+      const wanted = MAX_PAGE_SIZE + 1;
+      const existing = await adapter.gossip.list(WEDDING, ANY_STATUS, { limit: MAX_PAGE_SIZE });
+      for (let i = existing.items.length; i < wanted; i += 1) {
+        await adapter.gossip.create(WEDDING, { body: `Filler ${String(i)}`, mediaId: null });
+      }
+
+      const huge = await adapter.gossip.list(WEDDING, ANY_STATUS, { limit: 10_000 });
+
+      expect(huge.items).toHaveLength(MAX_PAGE_SIZE);
+      /* And it says there is more, rather than pretending the clamp was the end. */
+      expect(huge.nextCursor).not.toBeNull();
     });
 
     it('rejects a cursor it did not issue instead of returning a wrong page', async () => {
@@ -282,18 +310,34 @@ describe.each(SUBJECTS)('$name adapter', ({ create }: Subject) => {
       expect(seen).toEqual(['deleted']);
     });
 
-    it('survives a listener that throws, without failing the write', async () => {
-      /* Listeners run after the write is persisted, so an escaping exception rejects a call
-         whose row exists -- and a caller retrying a rejected create writes it twice. */
+    it('survives a listener that throws, without failing the write or the others', async () => {
+      /*
+       * Three separate promises, and the previous version of this case asserted one of them.
+       * Listeners run after the write is persisted, so an escaping exception rejects a call
+       * whose row exists -- and a caller retrying a rejected create writes it twice. It also
+       * stops delivery to every listener after the broken one, freezing everybody else's board.
+       *
+       * `resolves` alone catches neither: an adapter that discarded the row would pass it, and
+       * so would one that stopped at the first throw.
+       */
       const adapter = await create(WEDDING_ADMIN);
-      const stop = await adapter.gossip.subscribe(WEDDING, { statuses: ['pending'] }, () => {
+      const reached: string[] = [];
+
+      const stopBroken = await adapter.gossip.subscribe(WEDDING, ANY_STATUS, () => {
         throw new Error('a broken subscriber');
       });
+      const stopWorking = await adapter.gossip.subscribe(WEDDING, ANY_STATUS, () => {
+        reached.push('delivered');
+      });
 
-      await expect(
-        adapter.gossip.create(WEDDING, { body: 'Written regardless', mediaId: null }),
-      ).resolves.toBeDefined();
-      stop();
+      const body = 'Written regardless of a broken subscriber';
+      await expect(adapter.gossip.create(WEDDING, { body, mediaId: null })).resolves.toBeDefined();
+      stopBroken();
+      stopWorking();
+
+      expect(reached).toEqual(['delivered']);
+      const stored = await adapter.gossip.list(WEDDING, ANY_STATUS, { limit: MAX_PAGE_SIZE });
+      expect(stored.items.filter((post) => post.body === body)).toHaveLength(1);
     });
   });
 });
