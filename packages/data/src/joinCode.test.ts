@@ -22,10 +22,35 @@ describe('normaliseJoinCode', () => {
     expect(normaliseJoinCode('---')).toBeNull();
   });
 
-  it('strips the invisible characters a paste carries', () => {
-    /* A code copied out of a PDF or a chat message arrives with zero-width joiners and a BOM,
-       and none of them are on the card. */
-    expect(normaliseJoinCode('SAN\u200BRIY\uFEFF26')).toBe('SANRIY26');
+  it('strips everything invisible, not a list of the ones anybody thought of', () => {
+    /*
+     * A code copied out of a PDF or a chat message arrives carrying characters with no width at
+     * all, and none of them are on the card. The first version of the pattern enumerated four
+     * and missed U+2060 WORD JOINER — which is the failure mode of enumerating, so this asserts
+     * the class rather than the members.
+     */
+    const invisible = [
+      '\u200B', // zero width space
+      '\u200C', // zero width non-joiner
+      '\u200D', // zero width joiner
+      '\u2060', // word joiner — the one the list missed
+      '\uFEFF', // byte order mark
+      '\u00AD', // soft hyphen
+      '\u200E', // left-to-right mark
+    ];
+
+    for (const character of invisible) {
+      const typed = `SAN${character}RIY${character}26`;
+      expect([JSON.stringify(character), normaliseJoinCode(typed)]).toEqual([
+        JSON.stringify(character),
+        'SANRIY26',
+      ]);
+    }
+  });
+
+  it('strips the whitespace that is not a plain space', () => {
+    /* A non-breaking space is what a copied line of a PDF is full of. */
+    expect(normaliseJoinCode('SAN\u00A0RIY\u202F26')).toBe('SANRIY26');
   });
 });
 

@@ -13,11 +13,22 @@
  */
 
 /**
- * Everything a person might insert while transcribing, plus the invisible characters a paste
- * carries out of a PDF or a chat message. Written as escapes rather than as the characters
- * themselves: a zero-width joiner in a source file is a change nobody can see in a diff.
+ * Everything a person might insert while transcribing, plus everything invisible that a paste
+ * carries out of a PDF or a chat message.
+ *
+ * `\p{Cf}` — the Unicode format characters — rather than a list of the ones anybody has thought
+ * of. The first version enumerated four and missed U+2060 WORD JOINER, which is exactly the
+ * failure mode of enumerating: the list is always one short, and being one short means a code
+ * pasted out of a document does not match the code printed on the card, with nothing to see in
+ * the field to explain why. The class covers the zero-width spaces and joiners, the byte-order
+ * mark, the soft hyphen and the directional marks in one rule.
+ *
+ * `\s` covers ordinary and non-breaking whitespace; the three separators after it are the ones
+ * people type on purpose to make a code readable. Written as escapes rather than as the
+ * characters themselves, since a zero-width joiner in a source file is a change nobody can see
+ * in a diff.
  */
-const DECORATION = /[\s\-\u2013\u2014_.\u200B-\u200D\uFEFF]/gu;
+const DECORATION = /[\s\p{Cf}\-\u2013\u2014_.]/gu;
 
 /**
  * The comparable form of a code, or `null` when there is nothing left to compare.
