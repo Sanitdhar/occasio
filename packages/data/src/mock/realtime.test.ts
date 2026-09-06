@@ -241,6 +241,7 @@ describe('gossip subscriptions', () => {
      */
     const adapter = adapterFor(MODERATOR);
     const reached: string[] = [];
+    warn.mockClear();
 
     const stopBroken = await adapter.gossip.subscribe(WEDDING, { statuses: ALL }, () => {
       throw new Error('this subscriber is broken');
@@ -260,6 +261,12 @@ describe('gossip subscriptions', () => {
     expect(reached).toEqual(['delivered']);
     const stored = await adapter.gossip.list(WEDDING, { statuses: ['pending'] }, { limit: 50 });
     expect(stored.items.filter((p) => p.body === 'Written regardless')).toHaveLength(1);
+
+    /* Reported, not swallowed. Without this the whole case passes if the `console.warn` is
+       removed — and a catch that says nothing hides the very bug it is protecting the write
+       from, which is worse than the exception it replaced. */
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[1]).toBeInstanceOf(Error);
   });
 
   it('filters by the statuses the listener asked for', async () => {
