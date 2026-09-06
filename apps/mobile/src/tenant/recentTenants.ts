@@ -25,22 +25,50 @@ const readRaw = async (): Promise<{ readonly value: string | null; readonly lega
   return { value: await AsyncStorage.getItem(LEGACY_KEY), legacy: true };
 };
 
-export const readRecentTenants = async (): Promise<RecentTenant[]> => {
-  try {
-    const { value, legacy } = await readRaw();
-    const parsed = parseRecentTenants(value);
-    /* Migrated on the spot rather than read through the old key forever — otherwise every read
-       for the rest of this installation's life pays for a version nobody runs any more. */
-    if (legacy && parsed.length > 0) {
-      await serialise(async () => {
-        await AsyncStorage.setItem(RECENT_KEY, JSON.stringify(parsed));
-        await AsyncStorage.removeItem(LEGACY_KEY);
-      });
+/**
+ * Move a legacy value under the current key, and report what is actually stored afterwards.
+ *
+ * Queued, and it re-reads inside the queue rather than trusting what the caller parsed outside
+ * it. Between that parse and this task an event can have been remembered — the gate loading one
+ * while a deep link resolves another — and writing the parsed legacy list over it would delete
+ * the newer event. Every step here is a separate await, so the window is real rather than
+ * theoretical. A value that has appeared wins, and this reports that value rather than the stale
+ * one it was handed.
+ */
+const migrate = (entries: readonly RecentTenant[]): Promise<RecentTenant[]> =>
+  serialise(async () => {
+    const current = await AsyncStorage.getItem(RECENT_KEY);
+    if (current !== null) {
+      /* Superseded, so the old key is dead either way. */
+      await AsyncStorage.removeItem(LEGACY_KEY);
+      return parseRecentTenants(current);
     }
-    return parsed;
+    await AsyncStorage.setItem(RECENT_KEY, JSON.stringify(entries));
+    await AsyncStorage.removeItem(LEGACY_KEY);
+    return [...entries];
+  });
+
+export const readRecentTenants = async (): Promise<RecentTenant[]> => {
+  let parsed: readonly RecentTenant[];
+  let legacy: boolean;
+  try {
+    const raw = await readRaw();
+    parsed = parseRecentTenants(raw.value);
+    legacy = raw.legacy;
   } catch {
     /* Storage being unavailable is not worth failing a launch over — it costs the shortcut. */
     return [];
+  }
+
+  if (!legacy || parsed.length === 0) return [...parsed];
+
+  try {
+    return await migrate(parsed);
+  } catch {
+    /* The read worked and only the write failed — a full disk, a store not yet unlocked.
+       Returning `[]` here would throw away a perfectly good answer and blank the picker; the
+       legacy key is left in place so the next read can try the move again. */
+    return [...parsed];
   }
 };
 
