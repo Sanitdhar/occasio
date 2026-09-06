@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppAdapterProvider } from '../src/data/AppAdapterProvider';
 import { ErrorFallback } from '../src/features/errors/ErrorFallback';
+import { TenantProvider } from '../src/tenant/TenantProvider';
 import { AppThemeProvider } from '../src/theme/AppThemeProvider';
 import { APP_THEME } from '../src/theme/inputs';
 
@@ -53,9 +54,9 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 /**
  * The root layout composes providers and nothing else — no data fetching, no business logic.
  *
- * Providers arrive as their epics land: the theme provider with #22, tenant resolution and
- * session with the v0.2 milestone. Screens stay pure so the theme editor can render them under
- * an overridden provider later.
+ * Providers arrive as their epics land: the theme provider with #22, tenant resolution with
+ * #39, session with the rest of the v0.2 milestone. Screens stay pure so the theme editor can
+ * render them under an overridden provider later.
  */
 export default function RootLayout() {
   // Created once per app instance rather than per render, so the cache is not thrown away.
@@ -65,12 +66,16 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <AppAdapterProvider>
-          <AppThemeProvider input={APP_THEME}>
-            <SafeAreaProvider>
-              <StatusBar style="auto" />
-              <Stack screenOptions={{ headerShown: false }} />
-            </SafeAreaProvider>
-          </AppThemeProvider>
+          {/* No slug: the root is where the platform gets asked, once. Inside /e/[slug] the
+              route already knows, and its own provider says so rather than resolving again. */}
+          <TenantProvider>
+            <AppThemeProvider input={APP_THEME}>
+              <SafeAreaProvider>
+                <StatusBar style="auto" />
+                <Stack screenOptions={{ headerShown: false }} />
+              </SafeAreaProvider>
+            </AppThemeProvider>
+          </TenantProvider>
         </AppAdapterProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
