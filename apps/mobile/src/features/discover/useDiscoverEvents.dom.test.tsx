@@ -25,7 +25,12 @@ const flaky = () => {
     latency: { minMs: 0, maxMs: 0 },
   });
 
-  const state = { failing: true, configsFailing: false };
+  /*
+   * `configRejections` is what makes the theme assertion mean anything: `theme` is `null` while
+   * a config is pending *and* after it fails, so a test that only waits for the listing can
+   * assert against a request that has not settled and pass for the wrong reason.
+   */
+  const state = { failing: true, configsFailing: false, configDelayMs: 0, configRejections: 0 };
   const adapter: DataAdapter = {
     ...base,
     directory: {
@@ -39,7 +44,12 @@ const flaky = () => {
       ...base.tenants,
       config: (...args) =>
         state.configsFailing
-          ? Promise.reject(new Error('the network, probably'))
+          ? new Promise<never>((_, reject) => {
+              setTimeout(() => {
+                state.configRejections += 1;
+                reject(new Error('the network, probably'));
+              }, state.configDelayMs);
+            })
           : base.tenants.config(...args),
     },
   };
@@ -94,14 +104,32 @@ describe('useDiscoverEvents', () => {
     const { adapter, state } = flaky();
     state.failing = false;
     state.configsFailing = true;
+    /* Slow enough that the cards are listed well before any config settles, which is the
+       behaviour under test and also what stops the assertions below being satisfied by requests
+       that are merely still in flight. */
+    state.configDelayMs = 20;
 
     const { result } = renderHook(() => useDiscoverEvents(), { wrapper: wrap(adapter) });
 
     await waitFor(() => {
       expect(result.current.events.length).toBeGreaterThan(0);
     });
-    expect(result.current.failed).toBe(false);
+    const listed = result.current.events.length;
+
+    /*
+     * No assertion that the configs are *still* pending at this instant. That is a claim about
+     * scheduling — `waitFor` polls on its own interval, so the first rejection can land before it
+     * observes the events — and the property it was reaching for is covered where it can be held
+     * still, in DiscoverScreen's own test for a card whose theme is `null`.
+     */
+    await waitFor(() => {
+      expect(state.configRejections).toBe(listed);
+    });
+
+    /* Only now does `theme === null` mean "failed" rather than "not yet". */
+    expect(result.current.events).toHaveLength(listed);
     expect(result.current.events.every((event) => event.theme === null)).toBe(true);
+    expect(result.current.failed).toBe(false);
   });
 
   it('reports a failed listing, and recovers when retried', async () => {
