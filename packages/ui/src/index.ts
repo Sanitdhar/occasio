@@ -55,4 +55,28 @@ export {
   type ScrimPlacement,
 } from './media/imageFrame';
 
+export { Avatar, type AvatarProps, type AvatarSize } from './primitives/Avatar';
+export { Card, type CardProps } from './primitives/Card';
+export { Chip, type ChipProps } from './primitives/Chip';
+export {
+  Divider,
+  type DividerOrientation,
+  type DividerProps,
+  type DividerTone,
+} from './primitives/Divider';
+export { Surface, type SurfaceProps, type SurfaceShape } from './primitives/Surface';
+export { initialsFrom } from './primitives/initials';
+export {
+  SPACE_STEPS,
+  surfaceBackground,
+  surfacePalette,
+  tonalPalette,
+  type BorderTone,
+  type RadiusScale,
+  type SpaceScale,
+  type SurfaceTone,
+  type TonalPalette,
+  type TonalTone,
+} from './primitives/tones';
+
 export const UI_PACKAGE_VERSION = '0.0.0' as const;
