@@ -127,18 +127,37 @@ const claudeReviewed = rateLimited && (claudeFindings > 0 || claudeComment);
  * commit changing who may read invitation contact details, eight minutes after the review it
  * appeared to have.
  */
-const timestamps = [
-  ...reviews.filter((r) => byReviewer(r) || byClaude(r)).map((r) => r.submitted_at),
-  ...reviewComments.filter((c) => byReviewer(c) || byClaude(c)).map((c) => c.created_at),
-  ...issueComments.filter((c) => byReviewer(c) || byClaude(c)).map((c) => c.created_at),
+/*
+ * Only evidence that could make `reviewed` true may date it. Any reviewer comment would be
+ * wrong here in a specific and useful way: "Review limit reached" is posted by the reviewer,
+ * after the commit, and says a review did *not* happen — counting it would let the one comment
+ * that means "unreviewed" certify a stale review as fresh. Claude's activity is admitted only
+ * on the condition D42 gives it, matching `claudeReviewed` above.
+ */
+const reviewEvidence = [
+  ...reviews.filter((r) => byReviewer(r) && r.submitted_at != null).map((r) => r.submitted_at),
+  ...reviewComments.filter(byReviewer).map((c) => c.created_at),
+  ...issueComments
+    .filter((c) => byReviewer(c) && c.body.includes('Walkthrough'))
+    .map((c) => c.created_at),
+  ...(rateLimited
+    ? [
+        ...reviewComments.filter(byClaude).map((c) => c.created_at),
+        ...issueComments.filter(byClaude).map((c) => c.created_at),
+      ]
+    : []),
 ].filter((value) => value != null);
-const lastReviewAt = timestamps.length === 0 ? null : timestamps.sort().at(-1);
+const lastReviewAt = reviewEvidence.length === 0 ? null : reviewEvidence.sort().at(-1);
 
 const headCommit = await apiOne(`/repos/${REPO}/commits/${prData.head.sha}`);
 const headAt = headCommit.commit?.committer?.date ?? null;
-/* Unknown timestamps must not read as fresh: an absent one is a reason to look, not to pass. */
+/*
+ * Fails closed. An absent timestamp is a reason to look rather than to pass, and treating one
+ * as `not stale` would have made every unknown a quiet approval — which is the failure this
+ * whole file exists to answer, reintroduced by its newest check.
+ */
 const stale =
-  lastReviewAt === null || headAt === null ? false : Date.parse(headAt) > Date.parse(lastReviewAt);
+  lastReviewAt == null || headAt === null ? true : Date.parse(headAt) > Date.parse(lastReviewAt);
 
 const reviewed = walkthrough || findings > 0 || submitted > 0 || claudeReviewed;
 
@@ -156,7 +175,9 @@ console.log(`  head commit : ${prData.head.sha.slice(0, 7)} ${headAt ?? 'unknown
 
 if (reviewed && stale) {
   console.error(
-    `\nNOT REVIEWED. Head commit ${prData.head.sha.slice(0, 7)} (${String(headAt)}) is newer than the last review (${String(lastReviewAt)}).`,
+    lastReviewAt == null || headAt === null
+      ? `\nNOT REVIEWED. Could not date the review (${String(lastReviewAt)}) or the head commit (${String(headAt)}), so freshness cannot be established.`
+      : `\nNOT REVIEWED. Head commit ${prData.head.sha.slice(0, 7)} (${String(headAt)}) is newer than the last review (${String(lastReviewAt)}).`,
   );
   console.error(
     'The pull request has been reviewed; the code about to merge has not. Wait for the',

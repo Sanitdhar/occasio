@@ -26,7 +26,10 @@ const SHADOW_PROPERTIES = new Set([
  * limit of static analysis rather than a hole anyone can aim for.
  */
 const staticKeyName = (key) => {
-  if (key.type === 'Identifier') return key.name;
+  /* Deliberately no Identifier branch. In `{ [boxShadow]: 1 }` the identifier is a *reference*
+     — the property written is whatever that variable holds, which may be anything — so reading
+     `key.name` would report a raw shadow prop for code that writes `dataKey`. Only a key whose
+     text is the key qualifies. */
   if (key.type === 'Literal' && typeof key.value === 'string') return key.value;
   if (key.type === 'TemplateLiteral' && key.expressions.length === 0) {
     return key.quasis[0]?.value.cooked ?? null;

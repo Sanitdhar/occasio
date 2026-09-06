@@ -68,6 +68,15 @@ const CASES = [
     code: "export const s = { card: { ['boxShadow']: '0 1px 2px #000' } };\n",
   },
   {
+    /* The other half of the computed-key case: a bracketed *variable* is not a known key, and
+       reporting it would flag `{ [dataKey]: value }` as a hand-written shadow. */
+    label: 'ELEV a computed variable key is not reported',
+    file: 'packages/ui/src/__enforcement_probe_shadow_dynamic.ts',
+    rule: 'occasio/no-raw-shadow-props',
+    shouldFire: false,
+    code: "const k = 'width';\nexport const s = { card: { [k]: 4 } };\n",
+  },
+  {
     /*
      * Linted in memory at the translator's real path rather than written to disk under a name
      * the exemption happens to match. Writing a file called `elevation__enforcement_probe.ts`
