@@ -13,7 +13,13 @@
 type MediaListener = (event: { readonly matches: boolean }) => void;
 
 const state = { reduced: false };
-const listeners = new Set<MediaListener>();
+/*
+ * Listeners are kept with the query they registered for. A browser only notifies the listeners
+ * of a query whose result actually changed, so notifying all of them would let a test observe
+ * an event no browser can emit — and the listener's own `matches` would still say `false`,
+ * which is a contradiction a test could be written against by accident.
+ */
+const listeners = new Map<MediaListener, string>();
 
 const REDUCED_MOTION = 'prefers-reduced-motion';
 
@@ -29,9 +35,10 @@ export const installMatchMedia = (): void => {
         return query.includes(REDUCED_MOTION) && state.reduced;
       },
       onchange: null,
-      addEventListener: (_event: string, fn: MediaListener) => listeners.add(fn),
+      addEventListener: (_event: string, fn: MediaListener) => listeners.set(fn, query),
       removeEventListener: (_event: string, fn: MediaListener) => listeners.delete(fn),
-      addListener: (fn: MediaListener) => listeners.add(fn),
+      /* The deprecated pair, which is the one react-native-web falls back to. */
+      addListener: (fn: MediaListener) => listeners.set(fn, query),
       removeListener: (fn: MediaListener) => listeners.delete(fn),
       dispatchEvent: () => true,
     }),
@@ -41,7 +48,9 @@ export const installMatchMedia = (): void => {
 /** Sets the preference and notifies every listener, as a browser does. */
 export const setReducedMotion = (reduced: boolean): void => {
   state.reduced = reduced;
-  for (const listener of [...listeners]) listener({ matches: reduced });
+  for (const [listener, query] of [...listeners]) {
+    if (query.includes(REDUCED_MOTION)) listener({ matches: reduced });
+  }
 };
 
 /** Back to the default, with no listeners left over between tests. */
