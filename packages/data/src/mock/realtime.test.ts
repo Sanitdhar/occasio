@@ -83,8 +83,54 @@ describe('gossip subscriptions', () => {
     for (let i = 0; i < 3; i += 1) await adapter.gossip.report(WEDDING, post.id);
     stop();
 
-    expect(seen.length).toBeGreaterThan(0);
-    expect(seen.at(-1)?.kind).toBe('updated');
+    /* Asserting the outcome, not merely that something was emitted: every report emits an
+       update, so a threshold that never fired would still have satisfied a `kind` check while
+       the post stayed on the board. */
+    const last = seen.at(-1);
+    expect(last?.kind).toBe('updated');
+    expect(last !== undefined && last.kind !== 'deleted' ? last.item.status : null).toBe('hidden');
+  });
+
+  it('tells the queue when a post it is watching has been dealt with', async () => {
+    /*
+     * The moderation queue watches `pending`. Approving a post gives it `approved`, so a filter
+     * that looked only at the new status would tell the queue nothing — and the queue would go
+     * on showing a post somebody had already handled, which is the demo this feature exists for,
+     * broken.
+     *
+     * It arrives as `deleted`: the post still exists, it is simply no longer this view's to
+     * show, and `deleted` is the vocabulary a list has for dropping a row.
+     */
+    const adapter = adapterFor(MODERATOR);
+    const post = await adapter.gossip.create(WEDDING, { body: 'In the queue', mediaId: null });
+    const seen: GossipChange[] = [];
+
+    const stop = await adapter.gossip.subscribe(WEDDING, { statuses: ['pending'] }, (change) => {
+      seen.push(change);
+    });
+    await adapter.gossip.moderate(WEDDING, post.id, { status: 'approved' });
+    stop();
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.kind).toBe('deleted');
+  });
+
+  it('tells the board when an approved post is hidden', async () => {
+    /* The same transition in the other direction, and the one with a consequence: a board that
+       kept showing a hidden post is showing something a moderator removed. */
+    const adapter = adapterFor(MODERATOR);
+    const post = await adapter.gossip.create(WEDDING, { body: 'On the board', mediaId: null });
+    await adapter.gossip.moderate(WEDDING, post.id, { status: 'approved' });
+    const seen: GossipChange[] = [];
+
+    const stop = await adapter.gossip.subscribe(WEDDING, { statuses: ['approved'] }, (change) => {
+      seen.push(change);
+    });
+    await adapter.gossip.moderate(WEDDING, post.id, { status: 'hidden', reason: 'Reported' });
+    stop();
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.kind).toBe('deleted');
   });
 
   it('stops delivering the moment it is unsubscribed', async () => {

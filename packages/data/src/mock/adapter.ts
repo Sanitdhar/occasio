@@ -1029,23 +1029,42 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
   const gossipListeners = new Set<GossipSubscription>();
 
   /**
-   * Delivered synchronously, after the write has been persisted.
+   * Tells every subscriber what changed, in the terms of what that subscriber is watching.
    *
-   * Synchronous because the alternative -- a microtask or a timer -- makes "the post appeared"
-   * something a test has to wait for and a screen has to tolerate arriving late. Iterating a
-   * copy because a listener is entitled to unsubscribe from inside its own callback, which is
-   * what a React effect does when the change it just received unmounts the component.
+   * The subtlety is that a status change moves a post *between* views, so filtering on the new
+   * status alone is not enough: the moderation queue watches `pending`, and approving a post
+   * gives it `approved`, so the queue would be told nothing and go on showing a post that has
+   * already been dealt with. That is the demo this feature exists for, broken.
+   *
+   * So a subscriber hears about a post if it matched their filter before *or* after. It arrives
+   * as a `deleted` when it has left their view — which is what a queue needs to remove a row —
+   * and as `created` or `updated` when it is in it.
+   *
+   * Delivered synchronously, because a microtask makes "the post appeared" something a test has
+   * to wait for and a screen has to tolerate arriving late. Over a copy of the set, because a
+   * listener is entitled to unsubscribe from inside its own callback, which is what a React
+   * effect does when the change it just received unmounts the component.
    */
-  const emitGossip = (tenant: TenantId, change: GossipChange): void => {
+  const emitGossip = (
+    tenant: TenantId,
+    /** `null` for a post that did not exist before, which is what makes the change a creation. */
+    previousStatus: ModerationStatus | null,
+    item: GossipPost,
+  ): void => {
     for (const subscription of [...gossipListeners]) {
       if (subscription.tenantId !== tenant) continue;
-      /* A deletion has no status to filter on. Nothing deletes a gossip post today -- removal
-         is `hidden`, which is an update -- so this is the branch that keeps the filter honest
-         rather than one anything reaches. */
-      if (change.kind !== 'deleted' && !subscription.statuses.includes(change.item.status)) {
-        continue;
-      }
-      subscription.listener(change);
+
+      const wasVisible = previousStatus !== null && subscription.statuses.includes(previousStatus);
+      const isVisible = subscription.statuses.includes(item.status);
+      if (!wasVisible && !isVisible) continue;
+
+      subscription.listener(
+        isVisible
+          ? { kind: previousStatus === null ? 'created' : 'updated', item }
+          : /* Left this subscriber's view. `deleted` is the vocabulary a list has for "drop
+               this row"; the post still exists, it is simply no longer theirs to show. */
+            { kind: 'deleted', id: item.id },
+      );
     }
   };
 
@@ -1118,7 +1137,7 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
          replaced, and announcing a post that was never stored would put it on every open board
          until the next reload contradicted it. */
       if (await commit(current, { gossipPosts: [...current.tables.gossipPosts, row] })) {
-        emitGossip(tenantId, { kind: 'created', item: created });
+        emitGossip(tenantId, null, created);
       }
       return created;
     },
@@ -1165,7 +1184,7 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
          * receiving `updated` for something it has not got can insert it, and a queue receiving
          * it for something it has can remove it, which is not true the other way round.
          */
-        emitGossip(tenantId, { kind: 'updated', item: moderated });
+        emitGossip(tenantId, row.status, moderated);
       }
       return moderated;
     },
@@ -1201,7 +1220,7 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
       ) {
         /* A report can auto-hide a post (D31), and the board holding it has to hear about that
            as promptly as it would hear about a moderator's decision. */
-        emitGossip(tenantId, { kind: 'updated', item: toGossipPost(next) });
+        emitGossip(tenantId, row.status, toGossipPost(next));
       }
     },
 
