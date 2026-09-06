@@ -114,12 +114,20 @@ installed on the repo — without it, Claude has no permission to post comments 
 #### Exercising it deliberately
 
 ```sh
-gh workflow run claude-fallback-review.yml -f pr=<number>
+gh workflow run claude-fallback-review.yml -f pr=123   # a literal number, not a placeholder
 gh run list --workflow claude-fallback-review.yml --limit 1   # then watch it
 ```
 
 Do this after any change to the workflow, and read the comment it posts rather than trusting a
-green run — the run is green whether the review is useful or empty.
+green run — the run is green whether the comment is useful or empty.
+
+**A manual run does not review.** D42 allows Claude to review only when CodeRabbit could not,
+and a dispatch cannot know whether CodeRabbit already read the PR — so this mode posts one
+comment beginning _"Fallback reviewer validation run - this is not a review"_, saying what it
+was able to reach. That exercises everything that was unverified — checkout, auth,
+`allowed_bots`, the tool allow-list, `gh pr diff` with no PR head on disk, posting back —
+without producing the second review the decision prohibits. Run it against any open PR;
+it will not comment on the code.
 
 The manual trigger exists because for its first nine runs this workflow was `skipped` every
 time: no budget had run out, so the `if:` had never matched and not one step had ever executed
