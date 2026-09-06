@@ -6,6 +6,7 @@ import {
   ForbiddenError,
   NotFoundError,
   ValidationError,
+  type ValidationIssue,
   isDataError,
   isForbiddenError,
   isNotFoundError,
@@ -103,6 +104,91 @@ describe('ValidationError', () => {
     const error = new ValidationError(issues);
     issues.push({ path: 'mediaId', message: 'unknown media' });
     expect(error.issues).toHaveLength(1);
+  });
+
+  it('copies each issue, not just the array holding them', () => {
+    /*
+     * `[...issues]` closed the longer route and left the shorter one open: the entries were
+     * shared, so these assignments used to reach straight into the error. `message` is built
+     * once in the constructor, so the result was one error object describing itself two ways —
+     * `issues[0].message` saying one thing and `error.message` still saying the other.
+     *
+     * The array is held in a variable and its entry replaced as well as mutated, so this covers
+     * detachment from the caller's array and from the objects in it. An inline literal would
+     * have proved only the second.
+     */
+    const issue = { path: 'body', message: 'must not be empty' };
+    const issues = [issue];
+    const error = new ValidationError(issues);
+
+    issue.message = 'something else entirely';
+    issues[0] = { path: 'mediaId', message: 'unknown media' };
+
+    expect(error.issues[0]).toEqual({ path: 'body', message: 'must not be empty' });
+    expect(error.message).toContain('must not be empty');
+  });
+
+  it('does not freeze the caller’s own issues on the way past', () => {
+    /* Freezing `issue` rather than the copy of it would reach back out and immobilise an object
+       the caller still owns — a constructor with an opinion about somebody else's data. */
+    const issue = { path: 'body', message: 'must not be empty' };
+    new ValidationError([issue]);
+
+    expect(Object.isFrozen(issue)).toBe(false);
+  });
+
+  it('copies fields that a spread would not see', () => {
+    /*
+     * `ValidationIssue` is a structural type, so an object whose fields come from a prototype
+     * getter satisfies it completely — and `{ ...issue }` copies own enumerable properties, so
+     * it would have produced `{}`. `describe` reads the values directly, so the message would
+     * come out right while `issues[0]` was empty: the same error describing itself two ways,
+     * through the line written to prevent exactly that.
+     */
+    class PrototypeIssue implements ValidationIssue {
+      /* Private, so the instance has no own enumerable property at all and spreading it yields
+         `{}` — which a `readonly` field, the shape lint would rather see here, would quietly
+         not be, leaving the test green against the very code it is meant to catch. */
+      readonly #field: string;
+
+      constructor(field: string) {
+        this.#field = field;
+      }
+
+      get path(): string {
+        return this.#field;
+      }
+
+      get message(): string {
+        return `${this.#field} must not be empty`;
+      }
+    }
+
+    const error = new ValidationError([new PrototypeIssue('body')]);
+
+    expect(error.issues[0]).toEqual({ path: 'body', message: 'body must not be empty' });
+    expect(error.message).toContain('body must not be empty');
+  });
+
+  it('will not let the error’s own copy drift from its message either', () => {
+    /*
+     * The same desync from the other side. `readonly` is erased at build time and stops nobody
+     * at runtime, so the issues are frozen: under a module's strict mode this throws instead of
+     * quietly reintroducing the defect the copy above exists to prevent.
+     */
+    const error = new ValidationError([{ path: 'body', message: 'must not be empty' }]);
+
+    expect(() => {
+      const [first] = error.issues;
+      if (first !== undefined) Object.assign(first, { message: 'rewritten' });
+    }).toThrow(TypeError);
+
+    expect(error.issues[0]?.message).toBe('must not be empty');
+    /* The array too, not only the entries — otherwise an issue could still be appended to an
+       error whose message was built before it existed. Asserted through `Object.isFrozen`
+       rather than by calling `push`, which `readonly ValidationIssue[]` does not offer and
+       which reaching for a cast to obtain would be its own lint error. */
+    expect(Object.isFrozen(error.issues)).toBe(true);
   });
 });
 
