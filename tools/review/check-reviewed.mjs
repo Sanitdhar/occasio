@@ -21,6 +21,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { parseExcludedPaths } from './reviewablePaths.mjs';
+import { parseAutoReview } from './autoReview.mjs';
 import { evaluate } from './reviewGate.mjs';
 
 const REPO = process.env['GITHUB_REPOSITORY'] ?? 'dharlabs/occasio';
@@ -82,15 +83,18 @@ const apiAll = async (path) => {
 };
 
 /** Read once. Absent in a checkout that does not have it, which simply excludes nothing. */
-const excludedPaths = (() => {
+const reviewerConfig = (() => {
   try {
-    return parseExcludedPaths(readFileSync('.coderabbit.yaml', 'utf8'));
+    return readFileSync('.coderabbit.yaml', 'utf8');
   } catch {
-    return [];
+    return null;
   }
 })();
 
-const v = await evaluate({ api, apiAll, repo: REPO, pr, excludedPaths });
+const excludedPaths = reviewerConfig === null ? [] : parseExcludedPaths(reviewerConfig);
+const autoReview = reviewerConfig === null ? null : parseAutoReview(reviewerConfig);
+
+const v = await evaluate({ api, apiAll, repo: REPO, pr, excludedPaths, autoReview });
 
 console.log(`PR #${pr} — ${v.title}`);
 console.log(`  status      : ${v.reviewerState} | ${v.reviewerDescription}`);
@@ -122,6 +126,33 @@ if (v.reviewed && v.stale) {
 }
 
 if (!v.reviewed) {
+  /*
+   * Three reasons, and they are not the same problem.
+   *
+   * "Not reviewed yet" resolves by waiting. "The budget ran out" resolves when it resets, or
+   * when the fallback steps in. "This base branch was never configured for auto review" does
+   * not resolve at all, however long anybody waits — #132 sat idle for seven and a half hours
+   * looking exactly like the first case. Saying which one it is turns a wait into an action.
+   */
+  if (v.autoReviewStatus === 'disabled') {
+    console.error(
+      '\nNOT REVIEWED. Auto review is switched off for this repository — `reviews.auto_review.enabled` is false in .coderabbit.yaml, so no pull request is picked up automatically.',
+    );
+    console.error('This will not resolve on its own. Either turn it back on, or ask for a');
+    console.error('review by hand with an `@coderabbitai review` comment on the pull request.');
+    process.exit(1);
+  }
+  if (v.autoReviewStatus === 'base-not-configured') {
+    console.error(
+      `\nNOT REVIEWED. Auto review is not enabled for the base branch \`${v.baseRef ?? '?'}\`, so CodeRabbit skipped this pull request.`,
+    );
+    console.error('This will not resolve on its own. Either add a matching pattern to');
+    console.error(
+      '`reviews.auto_review.base_branches` in .coderabbit.yaml, or ask for a review by hand',
+    );
+    console.error('with an `@coderabbitai review` comment on the pull request.');
+    process.exit(1);
+  }
   console.error(
     `\nNOT REVIEWED. ${v.rateLimited ? 'The review budget was exhausted, and Claude has not stepped in yet; wait for .github/workflows/claude-fallback-review.yml or for the budget to reset.' : 'No walkthrough, finding or submitted review from a known reviewer account.'}`,
   );

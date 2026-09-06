@@ -12,6 +12,7 @@
 import { isReviewable } from './reviewablePaths.mjs';
 import { COMPARE_FILE_CAP, coversAllOf, diffEntries, isDescribable } from './diffFingerprint.mjs';
 import { isFullReviewFinished } from './reviewMarkers.mjs';
+import { autoReviewState } from './autoReview.mjs';
 
 /**
  * Exact logins, not a substring match.
@@ -92,7 +93,14 @@ const effectiveDiff = async (api, repo, base, sha, excludedPaths) => {
  * Returned as data rather than printed, so the CLI decides how to say it and the tests can ask
  * about any single rule without parsing prose.
  */
-export const evaluate = async ({ api, apiAll, repo, pr, excludedPaths = [] }) => {
+export const evaluate = async ({
+  api,
+  apiAll,
+  repo,
+  pr,
+  excludedPaths = [],
+  autoReview = null,
+}) => {
   const [issueComments, reviewComments, reviews, prData] = await Promise.all([
     apiAll(`/repos/${repo}/issues/${pr}/comments`),
     apiAll(`/repos/${repo}/pulls/${pr}/comments`),
@@ -268,7 +276,18 @@ export const evaluate = async ({ api, apiAll, repo, pr, excludedPaths = [] }) =>
   const stale = newerThanReview && !rebasedOnly;
   const reviewed = walkthrough || findings > 0 || submitted > 0 || claudeReviewed;
 
+  /*
+   * Whether this pull request is one CodeRabbit will ever auto-review, and if not, why.
+   *
+   * `unknown` when nothing was configured to check against — that has to stay distinct from
+   * every real setting, because "we cannot tell" and "no branch qualifies" want different words
+   * and only one of them is worth saying out loud.
+   */
+  const autoReviewStatus = baseRef === null ? 'unknown' : autoReviewState(autoReview, baseRef);
+
   return {
+    baseRef,
+    autoReviewStatus,
     title: prData?.title ?? '',
     headSha,
     headAt,
