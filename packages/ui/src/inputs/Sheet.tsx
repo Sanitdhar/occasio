@@ -97,6 +97,16 @@ export function Sheet({ visible, onDismiss, label, children, testID }: Props) {
           /* react-native-web gives an enabled Pressable `tabIndex={0}`, so without this the
              first Tab inside a sheet lands on an invisible element that announces nothing. */
           tabIndex={-1}
+          /*
+           * The one Pressable in this package with no hover or pressed fill, deliberately.
+           *
+           * The house rule that every pressable shows its four states is about controls, and
+           * this is not one — it is the scrim, and it is the size of the screen. A hover tint
+           * on it means the page behind the sheet changes shade whenever the pointer moves;
+           * a pressed fill means the whole screen flashes on the way to dismissing. That is
+           * not feedback, it is the background misbehaving. What acknowledges the tap is the
+           * sheet leaving.
+           */
           style={styles.backdrop}
           onPress={onDismiss}
         />
