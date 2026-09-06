@@ -111,6 +111,28 @@ Authenticated with a `CLAUDE_CODE_OAUTH_TOKEN` repository secret (generated via
 `claude setup-token`), and requires the official [Claude GitHub app](https://github.com/apps/claude)
 installed on the repo — without it, Claude has no permission to post comments back to the PR.
 
+#### Exercising it deliberately
+
+```sh
+gh workflow run claude-fallback-review.yml -f pr=<number>
+gh run list --workflow claude-fallback-review.yml --limit 1   # then watch it
+```
+
+Do this after any change to the workflow, and read the comment it posts rather than trusting a
+green run — the run is green whether the review is useful or empty.
+
+The manual trigger exists because for its first nine runs this workflow was `skipped` every
+time: no budget had run out, so the `if:` had never matched and not one step had ever executed
+(#142). Everything about it was an assumption — the login it posts as, whether `allowed_bots`
+opts in correctly, whether `gh pr diff` works without the PR head checked out (changed in #133
+and never exercised since), whether the token still has its scopes. A fallback nobody has
+watched work is discovered at the one moment there is nothing to fall back to, which is why
+`check:reviewed` will not accept a Claude review as satisfying D40 unless CodeRabbit was
+actually rate-limited on that PR.
+
+Dispatching needs write access to the repository, so it is available to exactly the people who
+could edit the workflow anyway.
+
 ### Parallel work is capped by the review budget, not by machines
 
 CodeRabbit's capacity is a rolling, plan-dependent quota — not a number worth hardcoding here,
