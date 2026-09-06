@@ -224,3 +224,23 @@ export {
 export { EMPTY_TABLES, MOCK_STORAGE_KEY, type MockSeed, type MockTables } from './mock/tables';
 
 export const DATA_SCHEMA_VERSION = 1 as const;
+
+/* The four fixture events (#35). Exported from the barrel because the app seeds the mock
+   adapter with them and the visual gate screenshots all four — but they are data, not the
+   adapter: `createMockAdapter` takes a seed, and a test seeds three rows instead. */
+export {
+  CONFERENCE,
+  CONFERENCE_CONFIG,
+  CONFERENCE_TENANT,
+  FESTIVAL,
+  FESTIVAL_CONFIG,
+  FESTIVAL_TENANT,
+  FIXTURE_NOW,
+  FIXTURE_SEED,
+  REUNION,
+  REUNION_CONFIG,
+  REUNION_TENANT,
+  WEDDING,
+  WEDDING_CONFIG,
+  WEDDING_TENANT,
+} from './fixtures/index';
