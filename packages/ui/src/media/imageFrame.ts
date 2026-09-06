@@ -18,14 +18,25 @@ import type { ReactNode } from 'react';
 /**
  * What the accessibility layer needs, expressed structurally so this file stays free of React
  * Native. Every field is assignable to the prop of the same name on a View or an expo-image.
+ *
+ * ARIA spellings, for the reason #127 established: react-native-web 0.21's forwarded-prop table
+ * does not carry `accessibilityState` at all and marks `accessibilityRole` and
+ * `accessibilityLabel` deprecated, each emitting a `warnOnce`. React Native maps `role`,
+ * `aria-label` and `aria-hidden` back to the native equivalents — `aria-hidden` covers both
+ * `accessibilityElementsHidden` on iOS and `importantForAccessibility` on Android — so nothing
+ * is lost on device, and web, which ships first (D30), gets props it actually reads.
+ *
+ * That this is a structural type is what made it more than a rename: the two hiding props were
+ * one boolean and one string union, and their replacement is a single optional flag, so every
+ * construction site below had to be re-decided rather than search-replaced.
  */
 export type ImageAccessibility = {
   readonly accessible: boolean;
   /** Becomes the `alt` attribute on web. Empty string is the correct value for decoration. */
-  readonly accessibilityLabel: string;
-  readonly accessibilityElementsHidden: boolean;
-  readonly importantForAccessibility: 'yes' | 'no-hide-descendants';
-  readonly accessibilityRole?: 'image';
+  readonly 'aria-label': string;
+  /** Omitted rather than `false`, so a described image carries no hiding prop at all. */
+  readonly 'aria-hidden'?: true;
+  readonly role?: 'img';
 };
 
 /**
@@ -66,13 +77,7 @@ export const imageAccessibility = (
        contradiction is reported rather than resolved silently. */
     if (decorative) warnInDevelopment('both `alt` and `decorative` were given; using `alt`.');
 
-    return {
-      accessible: true,
-      accessibilityRole: 'image',
-      accessibilityLabel: alt,
-      accessibilityElementsHidden: false,
-      importantForAccessibility: 'yes',
-    };
+    return { accessible: true, role: 'img', 'aria-label': alt };
   }
 
   if (!decorative) {
@@ -83,12 +88,7 @@ export const imageAccessibility = (
     );
   }
 
-  return {
-    accessible: false,
-    accessibilityLabel: '',
-    accessibilityElementsHidden: true,
-    importantForAccessibility: 'no-hide-descendants',
-  };
+  return { accessible: false, 'aria-label': '', 'aria-hidden': true };
 };
 
 /* -------------------------------------------------------------------------------------------
@@ -102,9 +102,19 @@ export const imageAccessibility = (
  * when the title is empty and `{caption ?? null}` to `null` — React renders nothing for either,
  * and both are how a caller writes "sometimes there is a caption". Treating them as content puts
  * a scrim and an empty overlay over a photograph that has no text on it at all.
+ *
+ * The empty string and the empty array are the same bug and were both counted as content:
+ * `{caption}` where the caption is `''`, and `{items.map(…)}` where the list is empty, each
+ * paint nothing. So does an array whose every entry collapses — `[null, false]` — which is what
+ * a list of conditionals leaves behind, so this recurses rather than checking only the array
+ * itself. A number stays content: React paints `0`.
  */
-export const hasOverlay = (children: ReactNode): boolean =>
-  children !== undefined && children !== null && typeof children !== 'boolean';
+export const hasOverlay = (children: ReactNode): boolean => {
+  if (children === undefined || children === null || typeof children === 'boolean') return false;
+  if (typeof children === 'string') return children !== '';
+  if (Array.isArray(children)) return children.some(hasOverlay);
+  return true;
+};
 
 /* -------------------------------------------------------------------------------------------
  * Scrim

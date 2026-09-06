@@ -200,8 +200,7 @@ export function Image({
           /* Decoration over a picture: it must never eat a tap meant for the card beneath it,
              and it must never be announced. */
           pointerEvents="none"
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
+          aria-hidden
           style={styles.scrim}
         />
       )}
