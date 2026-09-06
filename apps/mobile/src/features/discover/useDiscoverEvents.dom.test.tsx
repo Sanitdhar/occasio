@@ -16,7 +16,7 @@ import { useDiscoverEvents } from './useDiscoverEvents';
 
 const clients: QueryClient[] = [];
 
-/** Fails until told otherwise, then behaves. */
+/** Fails until told otherwise, then behaves. Each surface fails independently. */
 const flaky = () => {
   const base = createMockAdapter({
     currentUserId: userId('u_sanit'),
@@ -25,7 +25,7 @@ const flaky = () => {
     latency: { minMs: 0, maxMs: 0 },
   });
 
-  const state = { failing: true };
+  const state = { failing: true, configsFailing: false };
   const adapter: DataAdapter = {
     ...base,
     directory: {
@@ -34,6 +34,13 @@ const flaky = () => {
         state.failing
           ? Promise.reject(new Error('the network, probably'))
           : base.directory.listForUser(...args),
+    },
+    tenants: {
+      ...base.tenants,
+      config: (...args) =>
+        state.configsFailing
+          ? Promise.reject(new Error('the network, probably'))
+          : base.tenants.config(...args),
     },
   };
 
@@ -72,6 +79,29 @@ describe('useDiscoverEvents', () => {
     expect(result.current.failed).toBe(false);
     /* Each event brings its own published theme, which is what the cards are for. */
     expect(result.current.events.every((event) => event.theme !== null)).toBe(true);
+  });
+
+  it('keeps the cards when only their themes fail to load', async () => {
+    /*
+     * The two failures are not the same failure. A listing that will not load leaves nothing to
+     * show; a config that will not load costs one card its palette, and a card in the wrong
+     * colours is still a way into the event. Holding the whole page back for a detail nobody has
+     * noticed would trade what somebody came for against what they did not.
+     *
+     * This was written down in a comment and asserted nowhere, which is how the sentence would
+     * have quietly stopped being true.
+     */
+    const { adapter, state } = flaky();
+    state.failing = false;
+    state.configsFailing = true;
+
+    const { result } = renderHook(() => useDiscoverEvents(), { wrapper: wrap(adapter) });
+
+    await waitFor(() => {
+      expect(result.current.events.length).toBeGreaterThan(0);
+    });
+    expect(result.current.failed).toBe(false);
+    expect(result.current.events.every((event) => event.theme === null)).toBe(true);
   });
 
   it('reports a failed listing, and recovers when retried', async () => {
