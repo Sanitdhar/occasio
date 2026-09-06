@@ -46,17 +46,17 @@ Decisions with enough consequence to need their own reasoning have an [ADR](adr/
 
 ## Backend and operations
 
-| #   | Decision                                                                                                                                   |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| D5  | Supabase is the backend — behind adapters, so it is replaceable                                                                            |
-| D4  | Phase 1 is a UI prototype with no backend; mock data is shaped exactly like the eventual tables                                            |
-| D26 | Background jobs are an outbox table plus `pg_cron` → Edge Function. **No workflow engine.** [ADR-0005](adr/0005-no-workflow-engine.md)     |
-| D27 | Media sits behind a `StorageAdapter` — Supabase Storage now, Cloudflare R2 when photos arrive                                              |
-| D28 | Sign-in is Google OAuth only. Known constraints: Apple requires Sign in with Apple before iOS release, and native Google needs a dev build |
-| D30 | Web first — free hosting, no store review. Native follows once the product is proven                                                       |
-| D31 | Gossip abuse control: per-device rate limit, silent device block, and attendee reports                                                     |
-| D32 | Sentry for errors, PostHog for product analytics, both behind a thin wrapper                                                               |
-| D33 | Transactional email is Resend, behind a `MailerAdapter`                                                                                    |
+| #   | Decision                                                                                                                                                                                |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D5  | Supabase is the backend — behind adapters, so it is replaceable                                                                                                                         |
+| D4  | Phase 1 is a UI prototype with no backend; mock data is shaped exactly like the eventual tables                                                                                         |
+| D26 | Background jobs are an outbox table plus `pg_cron` → Edge Function. **No workflow engine.** [ADR-0005](adr/0005-no-workflow-engine.md)                                                  |
+| D27 | Media sits behind a `StorageAdapter` — Supabase Storage now, Cloudflare R2 when photos arrive                                                                                           |
+| D28 | Sign-in is Google OAuth only. Known constraints: Apple requires Sign in with Apple before iOS release, and native Google needs a dev build. [ADR-0007](adr/0007-google-only-sign-in.md) |
+| D30 | Web first — free hosting, no store review. Native follows once the product is proven                                                                                                    |
+| D31 | Gossip abuse control: per-device rate limit, silent device block, and attendee reports                                                                                                  |
+| D32 | Sentry for errors, PostHog for product analytics, both behind a thin wrapper                                                                                                            |
+| D33 | Transactional email is Resend, behind a `MailerAdapter`                                                                                                                                 |
 
 ## Process
 

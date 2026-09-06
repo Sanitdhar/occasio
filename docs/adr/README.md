@@ -12,3 +12,4 @@ the alternative was and what it would have cost.
 | [0004](0004-adapter-boundary.md)                | Backend independence enforced by lint and proven by contract tests    |
 | [0005](0005-no-workflow-engine.md)              | An outbox table instead of a workflow engine                          |
 | [0006](0006-anonymous-identity-model.md)        | Anonymous to humans, device-tracked underneath                        |
+| [0007](0007-google-only-sign-in.md)             | One sign-in provider, and what it will cost                           |
