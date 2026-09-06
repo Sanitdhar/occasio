@@ -1,5 +1,6 @@
 import {
   announcementId,
+  approvalRequestId,
   assignmentId,
   gossipPostId,
   membershipId,
@@ -11,6 +12,7 @@ import {
   tenantId,
   unitId,
   userId,
+  type ApprovalRequestId,
   type MediaId,
   type PersonId,
   type SessionId,
@@ -20,10 +22,8 @@ import {
   type VenueId,
 } from '@occasio/core';
 import { venueId } from '@occasio/core';
-import { approvalRequestId } from '../mock/mappers';
 import type {
   AnnouncementRow,
-  ApprovalRequestId,
   AssignmentRow,
   GossipPostRow,
   MediaAssetRow,
