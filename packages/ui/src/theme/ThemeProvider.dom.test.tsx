@@ -1,6 +1,7 @@
 import { themeInputFromPreset } from '@occasio/theme';
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { render, screen } from '@testing-library/react';
+import { Component, type ReactNode } from 'react';
 import { ThemeProvider } from './ThemeProvider';
 import { useTheme } from './useTheme';
 
@@ -20,6 +21,23 @@ import { useTheme } from './useTheme';
 const OUTER = themeInputFromPreset('romantic', '#7C3A5A');
 const INNER = themeInputFromPreset('festival', '#1E6F5C');
 
+/** The smallest boundary that reports what it caught, so the test can read the message. */
+class Boundary extends Component<{ readonly children: ReactNode }, { readonly message: string }> {
+  override state = { message: '' };
+
+  static getDerivedStateFromError(error: unknown): { readonly message: string } {
+    return { message: error instanceof Error ? error.message : String(error) };
+  }
+
+  override render(): ReactNode {
+    return this.state.message === '' ? (
+      this.props.children
+    ) : (
+      <p data-testid="boundary">{this.state.message}</p>
+    );
+  }
+}
+
 function Probe({ id }: { readonly id: string }) {
   const theme = useTheme();
   return <span data-testid={id}>{theme.color.brand}</span>;
@@ -34,6 +52,17 @@ const scopeFor = (testId: string): HTMLElement => {
 };
 
 describe('ThemeProvider', () => {
+  /* React logs a caught render error to console.error. Expected here, and noise otherwise. */
+  const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+  beforeEach(() => {
+    consoleError.mockClear();
+  });
+
+  afterAll(() => {
+    consoleError.mockRestore();
+  });
+
   it('re-themes only the subtree a nested provider wraps', () => {
     render(
       <ThemeProvider input={OUTER} forceScheme="light">
@@ -91,8 +120,25 @@ describe('ThemeProvider', () => {
   });
 
   it('refuses to render a themed component with no provider', () => {
-    /* Silently falling back to a default theme would put wrong colours on screen, which is far
-       harder to notice than a component that does not render at all. */
-    expect(() => render(<Probe id="orphan" />)).toThrow(/outside a <ThemeProvider>/);
+    /*
+     * Asserted through a boundary rather than `expect(render).toThrow`. React 19 does not
+     * rethrow an uncaught render error out of `render` -- it reports it through
+     * `window.reportError` -- so a root-level `toThrow` is testing a React implementation
+     * detail that is already on its way out. A boundary is also how this failure actually
+     * surfaces in the app, which makes the test a statement about the product rather than
+     * about the renderer.
+     *
+     * Silently falling back to a default theme would put wrong colours on screen, which is far
+     * harder to notice than a component that does not render at all.
+     */
+    render(
+      <Boundary>
+        <Probe id="orphan" />
+      </Boundary>,
+    );
+
+    expect(screen.getByTestId('boundary').textContent).toMatch(/outside a <ThemeProvider>/);
+    /* And the component genuinely did not render, rather than rendering beside the message. */
+    expect(screen.queryByTestId('orphan')).toBeNull();
   });
 });
