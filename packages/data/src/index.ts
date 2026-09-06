@@ -26,6 +26,14 @@ export { FEATURE_KEYS } from './config';
 
 export { DATA_ERROR_CODES } from './errors';
 export { joinCodeMatches, normaliseJoinCode } from './joinCode';
+export type {
+  AuthAdapter,
+  AuthEvent,
+  AuthListener,
+  AuthProvider,
+  AuthSession,
+  AuthUser,
+} from './auth';
 export type { DataErrorCode, ValidationIssue } from './errors';
 export {
   DataError,
@@ -207,6 +215,7 @@ export type {
  * the storage port it writes through.
  */
 export { createMockAdapter, type MockAdapter, type MockAdapterOptions } from './mock/adapter';
+export { createMockAuthAdapter, type MockAuthOptions } from './mock/authAdapter';
 export { createDefaultStorage } from './mock/defaultStorage';
 export {
   DEFAULT_LATENCY,
