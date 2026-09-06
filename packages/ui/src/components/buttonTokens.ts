@@ -53,6 +53,21 @@ export type FocusOrigin = 'blurred' | 'pointer' | 'keyboard';
 export const showsFocusRing = (origin: FocusOrigin, disabled: boolean): boolean =>
   origin === 'keyboard' && !disabled;
 
+/**
+ * What the focus origin becomes when a pointer goes down on the button.
+ *
+ * Focus events do not repeat: tab to a button and then click it and no second `onFocus` fires,
+ * because focus never moved. Without this the ring raised by the tab stays up through the click
+ * and after it — a focus ring on a mouse user, which is the single thing `focus-visible`
+ * exists to prevent. Browsers demote their own `:focus-visible` on pointer input for exactly
+ * this case.
+ *
+ * `blurred` is left alone rather than promoted to `pointer`: the focus event that follows the
+ * press is what decides, and it reads the same pointer flag this transition sets.
+ */
+export const focusOriginAfterPointerDown = (origin: FocusOrigin): FocusOrigin =>
+  origin === 'keyboard' ? 'pointer' : origin;
+
 export type ButtonTone = {
   readonly background: string;
   readonly border: string;

@@ -32,12 +32,16 @@ export const TYPE_CONTRACTS: {
   readonly radiusIsRejected: Rejects<{ borderRadius: number }, LayoutViewStyle>;
   readonly paddingIsRejected: Rejects<{ paddingHorizontal: number }, LayoutViewStyle>;
   readonly marginIsRejected: Rejects<{ marginTop: number }, LayoutViewStyle>;
+  /* An inset is a distance, so it is a spacing value arriving through the prop that was
+     narrowed to keep spacing values out. Positioning a child is the parent's job. */
+  readonly insetIsRejected: Rejects<{ left: number }, LayoutViewStyle>;
   readonly fontSizeIsRejected: Rejects<{ fontSize: number }, LayoutTextStyle>;
   readonly textColourIsRejected: Rejects<{ color: string }, LayoutTextStyle>;
 
   /* …while the layout properties the prop exists for still go through. A contract that rejects
      everything is not a contract, it is a broken prop. */
   readonly layoutIsAccepted: Accepts<{ alignSelf: 'stretch'; maxWidth: number }, LayoutViewStyle>;
+  readonly positionIsAccepted: Accepts<{ position: 'absolute'; zIndex: number }, LayoutViewStyle>;
   readonly textAlignIsAccepted: Accepts<{ textAlign: 'center' }, LayoutTextStyle>;
 
   /* The variant/tone pairing: `faint` only clears WCAG at large-text sizes. */
@@ -52,9 +56,11 @@ export const TYPE_CONTRACTS: {
   radiusIsRejected: true,
   paddingIsRejected: true,
   marginIsRejected: true,
+  insetIsRejected: true,
   fontSizeIsRejected: true,
   textColourIsRejected: true,
   layoutIsAccepted: true,
+  positionIsAccepted: true,
   textAlignIsAccepted: true,
   faintOnDefaultVariantIsRejected: true,
   faintOnSmallVariantIsRejected: true,

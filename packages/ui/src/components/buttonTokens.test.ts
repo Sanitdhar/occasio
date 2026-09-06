@@ -4,6 +4,7 @@ import {
   BUTTON_STATES,
   BUTTON_VARIANTS,
   buttonPalette,
+  focusOriginAfterPointerDown,
   resolveButtonState,
   showsFocusRing,
 } from './buttonTokens';
@@ -91,5 +92,25 @@ describe('focus ring', () => {
       .map(({ label, ratio }) => `${label} ${ratio.toFixed(2)}:1`);
 
     expect(failures).toEqual([]);
+  });
+});
+
+describe('focusOriginAfterPointerDown', () => {
+  it('takes the ring away from a button that was tabbed to and then clicked', () => {
+    /* The case the function exists for. Focus does not move, so no second `onFocus` fires, and
+       without this transition the ring raised by the tab would still be up under the pointer. */
+    expect(focusOriginAfterPointerDown('keyboard')).toBe('pointer');
+  });
+
+  it('leaves the other two origins alone', () => {
+    expect(focusOriginAfterPointerDown('pointer')).toBe('pointer');
+    /* Not promoted to `pointer`: the focus event that follows the press is what decides, and it
+       reads the pointer flag rather than this value. */
+    expect(focusOriginAfterPointerDown('blurred')).toBe('blurred');
+  });
+
+  it('never shows a ring for the origin it produces', () => {
+    /* The two functions have to agree, since one feeds the other. */
+    expect(showsFocusRing(focusOriginAfterPointerDown('keyboard'), false)).toBe(false);
   });
 });

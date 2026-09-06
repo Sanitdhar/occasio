@@ -12,6 +12,7 @@ import type { LayoutViewStyle } from './layoutStyle';
 import {
   buttonPalette,
   resolveButtonState,
+  focusOriginAfterPointerDown,
   showsFocusRing,
   type ButtonTone,
   type ButtonVariant,
@@ -140,6 +141,14 @@ export function Button({
   const handleHoverOut = useCallback(() => {
     setHovered(false);
   }, []);
+  /* Not `onPressIn`, which keyboard activation fires too — demoting the origin there would
+     take the ring away from the keyboard user at the moment they press Enter. `onPointerDown`
+     is raised only by a real pointer: React Native declares it on ViewProps, which Pressable
+     extends, and react-native-web forwards it to the DOM event of the same name. */
+  const handlePointerDown = useCallback(() => {
+    pointerDown.current = true;
+    setFocusOrigin(focusOriginAfterPointerDown);
+  }, []);
   const handleFocus = useCallback(() => {
     setFocusOrigin(pointerDown.current ? 'pointer' : 'keyboard');
   }, []);
@@ -161,6 +170,7 @@ export function Button({
       onHoverIn={handleHoverIn}
       onHoverOut={handleHoverOut}
       onPress={onPress}
+      onPointerDown={handlePointerDown}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       style={[styles.base, styles[`${variant}_${state}`], style]}

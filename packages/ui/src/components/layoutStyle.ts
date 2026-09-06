@@ -13,6 +13,14 @@ import type { TextStyle, ViewStyle } from 'react-native';
  * between components belongs to the parent's `gap`; anything else that looks missing is a
  * variant or a tone, not a style override. The list is deliberately tight — widening it later
  * is a non-breaking change, narrowing it is not.
+ *
+ * `top`, `right`, `bottom` and `left` are absent for the same reason as `margin`, and it is
+ * worth writing down because they read as layout: an inset is a distance, so `left: 13` is a
+ * spacing value off the theme's scale, arriving through the one prop that was narrowed to keep
+ * spacing values out. Where a child genuinely has to be positioned, it is the parent that knows
+ * where — so the parent wraps it in a positioned `View` of its own, which is the same answer
+ * `gap` gives for the space between two components. `position` and `zIndex` stay: they are
+ * enumerations and a layer index, and neither can express a distance.
  */
 
 type LayoutViewKey =
@@ -29,10 +37,6 @@ type LayoutViewKey =
   | 'minHeight'
   | 'maxHeight'
   | 'position'
-  | 'top'
-  | 'right'
-  | 'bottom'
-  | 'left'
   | 'zIndex';
 
 /** Plus the two text properties that shape a block without touching a type token. */
