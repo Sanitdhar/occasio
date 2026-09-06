@@ -86,6 +86,7 @@ export const UI_PACKAGE_VERSION = '0.0.0' as const;
 export { Screen } from './layout/Screen';
 export { Split } from './layout/Split';
 export { useBreakpoint } from './layout/useBreakpoint';
+export { splitRatio, DEFAULT_SPLIT_RATIO } from './layout/splitRatio';
 export {
   BREAKPOINT_NAMES,
   atLeast,

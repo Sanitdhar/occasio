@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import type { LayoutViewStyle } from '../components/layoutStyle';
 import { createStyles } from '../theme/createStyles';
 import { atLeast } from './breakpoints';
+import { splitRatio } from './splitRatio';
 import { useBreakpoint } from './useBreakpoint';
 
 /**
@@ -28,15 +29,12 @@ type Props = {
    * spacing scale for "two fifths" — and it is clamped so a caller cannot produce a pane of
    * zero width, which renders as a missing feature rather than as a narrow one.
    */
-  readonly ratio?: number;
+  readonly ratio?: number | undefined;
   /** Below this the panes stack. `md` is the tablet threshold and the editor's own cutoff. */
   readonly stackBelow?: 'sm' | 'md' | 'lg';
   readonly testID?: string;
   readonly style?: LayoutViewStyle | undefined;
 };
-
-const MIN_RATIO = 0.2;
-const MAX_RATIO = 0.8;
 
 /**
  * A fraction as the percentage string React Native's `flexBasis` wants.
@@ -63,21 +61,14 @@ const useStyles = createStyles((t) => ({
   full: { width: '100%' },
 }));
 
-export function Split({
-  primary,
-  secondary,
-  ratio = 0.5,
-  stackBelow = 'md',
-  testID,
-  style,
-}: Props) {
+export function Split({ primary, secondary, ratio, stackBelow = 'md', testID, style }: Props) {
   const styles = useStyles();
   const breakpoint = useBreakpoint();
   const sideBySide = atLeast(breakpoint, stackBelow);
 
-  /* Clamped rather than trusted: a ratio of 0 or 1 renders one pane as a hairline, which reads
-     as the feature being missing rather than as a layout mistake. */
-  const share = Math.min(Math.max(ratio, MIN_RATIO), MAX_RATIO);
+  /* Clamped and checked rather than trusted — see splitRatio.ts for why `NaN` needs its own
+     answer and why an unusable ratio falls back rather than throwing. */
+  const share = splitRatio(ratio);
 
   if (!sideBySide) {
     return (
