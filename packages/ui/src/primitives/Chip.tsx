@@ -40,6 +40,11 @@ const useChipStyles = createStyles((t) => ({
 
 export type ChipProps = {
   readonly tone?: TonalTone | undefined;
+  /**
+   * Present only on a chip that toggles. Left out — not set to `false` — on a plain tag, which
+   * is what tells the chip whether it is a checkbox or a button, and stops every filter chip
+   * announcing "not selected".
+   */
   readonly selected?: boolean | undefined;
   readonly onPress?: (() => void) | undefined;
   readonly disabled?: boolean | undefined;
@@ -53,7 +58,7 @@ export type ChipProps = {
 
 export function Chip({
   tone = 'neutral',
-  selected = false,
+  selected,
   onPress,
   disabled = false,
   leading,
@@ -64,7 +69,12 @@ export function Chip({
 }: ChipProps) {
   const theme = useTheme();
   const styles = useChipStyles();
-  const palette = tonalPalette(theme, selected ? 'brandSolid' : tone);
+  const palette = tonalPalette(theme, selected === true ? 'brandSolid' : tone);
+
+  /* A chip that toggles is a checkbox, not a button: `aria-selected` is only valid on options
+     and tabs, so a screen reader would ignore it on a button. `aria-checked` is valid here, is
+     forwarded by react-native-web, and React Native maps it to the native checked state. */
+  const togglable = onPress !== undefined && selected !== undefined;
 
   return (
     <InteractiveBox
@@ -72,11 +82,9 @@ export function Chip({
       boxStyle={styles.box}
       onPress={onPress}
       disabled={disabled}
-      accessibilityRole={onPress === undefined ? 'text' : 'button'}
-      /* Only a chip you can act on has a selection state; announcing "not selected" on a
-         read-only tag is noise. */
-      accessibilityState={onPress === undefined ? undefined : { selected }}
-      accessibilityLabel={children}
+      role={togglable ? 'checkbox' : undefined}
+      aria-checked={togglable ? selected : undefined}
+      aria-label={children}
       testID={testID}
       style={style}
     >

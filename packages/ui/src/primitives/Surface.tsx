@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import type { AccessibilityRole, StyleProp, ViewStyle } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { createStyles } from '../theme/createStyles';
 import { useTheme } from '../theme/useTheme';
-import { InteractiveBox } from './InteractiveBox';
+import { InteractiveBox, type BoxAccessibilityProps } from './InteractiveBox';
 import {
   SPACE_STEPS,
   surfacePalette,
@@ -20,6 +20,12 @@ import {
  * background image. `bg -> surface -> surfaceRaised` is the whole elevation model; genuinely
  * floating UI (a sheet, a menu) owns its own elevation rather than every box on the screen
  * carrying a shadow prop it almost never sets.
+ *
+ * There is deliberately no `elevation` prop, even though `theme.elevation` and
+ * `toElevationStyle()` exist. A shadow drawn on this box would be clipped by the `overflow:
+ * hidden` that makes the corner radius work, so a floating container composes the two instead:
+ * an outer View carrying `toElevationStyle(theme.elevation.md)` around a Surface. That keeps the
+ * shadow where it belongs — on the handful of things that genuinely float.
  *
  * Every size is an enumerated token, so the entire variant matrix is one cached StyleSheet per
  * theme rather than a fresh object per render.
@@ -96,16 +102,15 @@ export type SurfaceShape = {
   readonly gap?: SpaceScale | undefined;
 };
 
-export type SurfaceProps = SurfaceShape & {
-  /** Supplying this turns the surface into a Pressable with hover, press and focus states. */
-  readonly onPress?: (() => void) | undefined;
-  readonly disabled?: boolean | undefined;
-  readonly accessibilityRole?: AccessibilityRole | undefined;
-  readonly accessibilityLabel?: string | undefined;
-  readonly testID?: string | undefined;
-  readonly style?: StyleProp<ViewStyle> | undefined;
-  readonly children?: ReactNode;
-};
+export type SurfaceProps = SurfaceShape &
+  BoxAccessibilityProps & {
+    /** Supplying this turns the surface into a Pressable with hover, press and focus states. */
+    readonly onPress?: (() => void) | undefined;
+    readonly disabled?: boolean | undefined;
+    readonly testID?: string | undefined;
+    readonly style?: StyleProp<ViewStyle> | undefined;
+    readonly children?: ReactNode;
+  };
 
 export function Surface({
   tone = 'base',

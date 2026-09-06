@@ -1,12 +1,5 @@
 import type { ReactNode } from 'react';
-import {
-  Pressable,
-  View,
-  type AccessibilityRole,
-  type AccessibilityState,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { Pressable, View, type Role, type StyleProp, type ViewStyle } from 'react-native';
 import { createStyles } from '../theme/createStyles';
 import { useTheme } from '../theme/useTheme';
 import { DISABLED_OPACITY, interactiveFill } from './interaction';
@@ -22,8 +15,16 @@ import { usePressState } from './usePressState';
  *
  * `palette` carries resolved colour strings rather than token names. That is the one deliberate
  * exception to "components read tokens directly": the caller has already chosen its palette from
- * the theme (see tones.ts), and threading token names through would just move the switch
+ * the theme (see tones.ts), and threading token names through would only move the switch
  * statement one level down. Nothing here invents a colour.
+ *
+ * Accessibility uses the ARIA spellings throughout, for the reason #127 established for the
+ * feedback components: react-native-web 0.21's forwarded-prop table
+ * (`dist/modules/forwardedProps/index.js`) does not contain `accessibilityState` at all, and
+ * marks `accessibilityRole` and `accessibilityLabel` deprecated. A chip's selected state written
+ * the `accessibility*` way is dropped silently on web. React Native maps `role`, `aria-label`,
+ * `aria-checked` and `aria-disabled` back to the native equivalents, so nothing is lost on iOS
+ * or Android — and web, which ships first (D30), gets props it actually reads.
  */
 
 const useStyles = createStyles((t) => ({
@@ -37,15 +38,20 @@ const useStyles = createStyles((t) => ({
   disabled: { opacity: DISABLED_OPACITY },
 }));
 
-export type InteractiveBoxProps = {
+/** The accessibility props a primitive forwards. ARIA spellings — see the note above. */
+export type BoxAccessibilityProps = {
+  readonly role?: Role | undefined;
+  readonly 'aria-label'?: string | undefined;
+  /** For a chip that toggles. Left undefined by anything that is not a toggle. */
+  readonly 'aria-checked'?: boolean | undefined;
+};
+
+export type InteractiveBoxProps = BoxAccessibilityProps & {
   readonly palette: TonalPalette;
   /** The primitive's own computed styles. Caller overrides go in `style`, which lands last. */
   readonly boxStyle: StyleProp<ViewStyle>;
   readonly onPress?: (() => void) | undefined;
   readonly disabled?: boolean | undefined;
-  readonly accessibilityRole?: AccessibilityRole | undefined;
-  readonly accessibilityState?: AccessibilityState | undefined;
-  readonly accessibilityLabel?: string | undefined;
   readonly testID?: string | undefined;
   readonly style?: StyleProp<ViewStyle> | undefined;
   readonly children?: ReactNode;
@@ -56,9 +62,9 @@ export function InteractiveBox({
   boxStyle,
   onPress,
   disabled = false,
-  accessibilityRole,
-  accessibilityState,
-  accessibilityLabel,
+  role,
+  'aria-label': ariaLabel,
+  'aria-checked': ariaChecked,
   testID,
   style,
   children,
@@ -67,14 +73,17 @@ export function InteractiveBox({
   const styles = useStyles();
   const { hovered, focused, handlers } = usePressState();
 
+  /* Omitted rather than false: "not disabled" on every box is noise a screen reader reads out. */
+  const ariaDisabled = disabled ? true : undefined;
   const fill = { backgroundColor: palette.background, borderColor: palette.border };
 
   if (onPress === undefined) {
     return (
       <View
-        accessibilityRole={accessibilityRole}
-        accessibilityState={accessibilityState}
-        accessibilityLabel={accessibilityLabel}
+        role={role}
+        aria-label={ariaLabel}
+        aria-checked={ariaChecked}
+        aria-disabled={ariaDisabled}
         testID={testID}
         /* A box with no onPress still honours `disabled`: a chip that reads as available but
            silently does nothing is worse than one that looks switched off. */
@@ -87,9 +96,10 @@ export function InteractiveBox({
 
   return (
     <Pressable
-      accessibilityRole={accessibilityRole ?? 'button'}
-      accessibilityState={{ ...accessibilityState, disabled }}
-      accessibilityLabel={accessibilityLabel}
+      role={role ?? 'button'}
+      aria-label={ariaLabel}
+      aria-checked={ariaChecked}
+      aria-disabled={ariaDisabled}
       testID={testID}
       onPress={onPress}
       disabled={disabled}

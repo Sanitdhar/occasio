@@ -90,8 +90,10 @@ export function Avatar({
 
   return (
     <View
-      accessibilityRole="image"
-      accessibilityLabel={name}
+      /* ARIA spellings: react-native-web 0.21 marks the `accessibility*` ones deprecated, and
+         React Native maps these back to the native roles. `img` is the ARIA name for it. */
+      role="img"
+      aria-label={name}
       testID={testID}
       style={[
         styles.box,
@@ -101,7 +103,10 @@ export function Avatar({
       ]}
     >
       {children ?? (
+        /* Hidden from assistive technology: the circle already carries the full name, and
+           without this a screen reader reads "Ada Lovelace, A L". */
         <Text
+          aria-hidden
           numberOfLines={1}
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={[styles[LABEL_STYLE[size]], { color: palette.content }]}
