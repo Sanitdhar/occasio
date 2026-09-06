@@ -29,13 +29,18 @@ const at = (path: string) => {
   window.history.pushState({}, '', path);
 };
 
+/** Seeds the recent list the way the app writes it, so the read path is the one under test. */
+const remember = (entries: readonly { slug: string; name: string }[]) => {
+  window.localStorage.setItem('occasio.recentTenants', JSON.stringify(entries));
+};
+
 describe('TenantProvider', () => {
   beforeEach(() => {
     window.localStorage.clear();
     at('/');
   });
 
-  it('does not ask the platform when the route already knows', async () => {
+  it('does not ask the platform when the route already knows', () => {
     /* The URL is the answer. Asking again would be a second opinion about a fact, and it would
        cost a `resolving` frame on every navigation inside an event. */
     render(
@@ -45,9 +50,6 @@ describe('TenantProvider', () => {
     );
 
     expect(probe()).toBe('resolved:path:lila-and-sam');
-    await waitFor(() => {
-      expect(window.localStorage.getItem('occasio.recentTenant')).toBe('lila-and-sam');
-    });
   });
 
   it('reads the canonical path when it is not given a slug', async () => {
@@ -67,7 +69,7 @@ describe('TenantProvider', () => {
   it('falls back to the last event this browser opened', async () => {
     /* The one moment storage matters on web: the bare origin, opened by somebody who has been
        to an event before. */
-    window.localStorage.setItem('occasio.recentTenant', 'dev-summit-2026');
+    remember([{ slug: 'dev-summit-2026', name: 'Dev Summit' }]);
 
     render(
       <TenantProvider>
@@ -97,7 +99,7 @@ describe('TenantProvider', () => {
   it('ignores a stored value that is not a slug', async () => {
     /* Written by an older build, or by whoever had the console open. It is about to become a
        path segment. */
-    window.localStorage.setItem('occasio.recentTenant', '../../etc/passwd');
+    remember([{ slug: '../../etc/passwd', name: 'Nope' }]);
 
     render(
       <TenantProvider>
@@ -116,7 +118,7 @@ describe('TenantProvider', () => {
      * has been told the slug would overwrite a correct state with a stale one — and it would do
      * it a frame after the screen looked right, which is the hardest kind of bug to attribute.
      */
-    window.localStorage.setItem('occasio.recentTenant', 'dev-summit-2026');
+    remember([{ slug: 'dev-summit-2026', name: 'Dev Summit' }]);
 
     const { rerender } = render(
       <TenantProvider>

@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { writeRecentTenant } from './recentTenant';
 import { resolveTenant } from './resolveTenant';
 import { resolvedAs, resolving, type TenantResolution } from './tenantResolution';
 
@@ -14,6 +13,10 @@ import { resolvedAs, resolving, type TenantResolution } from './tenantResolution
  * Deliberately free of expo-router. The canonical route already knows its own slug and can say
  * so through `slug`, and keeping the router out means this renders under a test, under the theme
  * editor's preview, and anywhere else a screen needs a tenant without a URL.
+ *
+ * Remembering an event is `TenantGate`'s job rather than this one's. A slug that resolves is not
+ * yet an event somebody reached — it may not exist — and the gate is where the name is known,
+ * which the picker needs. Writing here would fill the recent list with mistyped addresses.
  */
 
 const TenantContext = createContext<TenantResolution | null>(null);
@@ -58,16 +61,6 @@ export function TenantProvider({ slug, children }: Props) {
       abandoned = true;
     };
   }, [slug]);
-
-  useEffect(() => {
-    /*
-     * Remember where we are, so a native launch with no deep link lands back here.
-     *
-     * Written on every resolution including `recent` itself, which is a harmless rewrite of the
-     * same value and one branch fewer to be wrong about.
-     */
-    if (resolution.kind === 'resolved') void writeRecentTenant(resolution.slug);
-  }, [resolution]);
 
   return <TenantContext.Provider value={resolution}>{children}</TenantContext.Provider>;
 }

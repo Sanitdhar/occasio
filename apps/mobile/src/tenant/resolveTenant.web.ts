@@ -1,5 +1,5 @@
 import { slugForHost } from './customDomains';
-import { readRecentTenant } from './recentTenant';
+import { readRecentTenants } from './recentTenants';
 import { firstResolved, slugFromPath, type TenantResolution } from './tenantResolution';
 
 /**
@@ -16,12 +16,14 @@ import { firstResolved, slugFromPath, type TenantResolution } from './tenantReso
  */
 export const resolveTenant = async (): Promise<TenantResolution> => {
   const url = currentUrl();
-  const recent = await readRecentTenant();
+  /* The head of the list: where this device was last. The rest of it is the join
+     screen's picker, which is the same data made visible. */
+  const [recent] = await readRecentTenants();
 
   return firstResolved([
     ['domain', url === null ? null : slugForHost(url.hostname)],
     ['path', url === null ? null : slugFromPath(url.pathname)],
-    ['recent', recent],
+    ['recent', recent?.slug ?? null],
   ]);
 };
 

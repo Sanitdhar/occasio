@@ -1,5 +1,5 @@
 import * as Linking from 'expo-linking';
-import { readRecentTenant } from './recentTenant';
+import { readRecentTenants } from './recentTenants';
 import {
   firstResolved,
   pathFromLink,
@@ -19,11 +19,13 @@ import {
  */
 export const resolveTenant = async (): Promise<TenantResolution> => {
   const initialUrl = await readInitialUrl();
-  const recent = await readRecentTenant();
+  /* The head of the list: where this device was last. The rest of it is the join
+     screen's picker, which is the same data made visible. */
+  const [recent] = await readRecentTenants();
 
   return firstResolved([
     ['link', initialUrl === null ? null : slugFromPath(pathOf(initialUrl))],
-    ['recent', recent],
+    ['recent', recent?.slug ?? null],
   ]);
 };
 
