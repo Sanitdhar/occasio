@@ -217,9 +217,15 @@ export default tseslint.config(
   },
 
   /* The two files whose entire job is translating an elevation spec into platform shadow
-     properties. Everything else goes through them. */
+     properties. Everything else goes through them.
+
+     Named exactly rather than as `elevation*.ts`: the glob also exempted anything else starting
+     with the word, so a future `elevationCard.ts` would have been born outside the rule without
+     anyone deciding that. It also exempted `elevation__enforcement_probe.ts` — the probe that
+     was proving the exemption worked — so that probe was really only proving the glob matched
+     its own name. It now lints the real translator path through `lintText`. */
   {
-    files: ['packages/ui/src/theme/elevation*.ts'],
+    files: ['packages/ui/src/theme/elevation.ts', 'packages/ui/src/theme/elevation.web.ts'],
     rules: { 'occasio/no-raw-shadow-props': 'off' },
   },
 

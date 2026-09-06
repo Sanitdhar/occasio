@@ -17,7 +17,13 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-/** @type {{ label: string, file: string, rule: string, shouldFire: boolean, code: string }[]} */
+/**
+ * `file` is written to disk and linted; `virtualPath` is linted in memory as if it were that
+ * path. Use `virtualPath` whenever the path under test is one a real source file already owns.
+ *
+ * @type {{ label: string, file?: string, virtualPath?: string, rule: string,
+ *          shouldFire: boolean, code: string }[]}
+ */
 const CASES = [
   {
     label: 'D8   theme may not import the data layer',
@@ -55,8 +61,31 @@ const CASES = [
     code: "export const s = { card: { shadowColor: 'x', shadowRadius: 4, elevation: 2 } };\n",
   },
   {
+    label: 'ELEV computed keys do not smuggle a shadow prop past the rule',
+    file: 'packages/ui/src/__enforcement_probe_shadow_computed.ts',
+    rule: 'occasio/no-raw-shadow-props',
+    shouldFire: true,
+    code: "export const s = { card: { ['boxShadow']: '0 1px 2px #000' } };\n",
+  },
+  {
+    /* The other half of the computed-key case: a bracketed *variable* is not a known key, and
+       reporting it would flag `{ [dataKey]: value }` as a hand-written shadow. */
+    label: 'ELEV a computed variable key is not reported',
+    file: 'packages/ui/src/__enforcement_probe_shadow_dynamic.ts',
+    rule: 'occasio/no-raw-shadow-props',
+    shouldFire: false,
+    code: "const k = 'width';\nexport const s = { card: { [k]: 4 } };\n",
+  },
+  {
+    /*
+     * Linted in memory at the translator's real path rather than written to disk under a name
+     * the exemption happens to match. Writing a file called `elevation__enforcement_probe.ts`
+     * only proved that `elevation*.ts` matched it — which was true, and was the bug: the glob
+     * exempted the probe as readily as the translator. Nothing here may write to
+     * `elevation.ts`, because that is a real source file.
+     */
     label: 'ELEV the elevation translator IS allowed to use them',
-    file: 'packages/ui/src/theme/elevation__enforcement_probe.ts',
+    virtualPath: 'packages/ui/src/theme/elevation.ts',
     rule: 'occasio/no-raw-shadow-props',
     shouldFire: false,
     code: "export const s = { shadowColor: 'x' };\n",
@@ -80,23 +109,34 @@ const CASES = [
 const eslint = new ESLint({ cwd: repoRoot });
 let failures = 0;
 
-for (const testCase of CASES) {
+/** Lints the case, on disk or in memory, and returns whether its rule fired. */
+const runCase = async (testCase) => {
+  if (testCase.virtualPath !== undefined) {
+    const [result] = await eslint.lintText(testCase.code, {
+      filePath: join(repoRoot, testCase.virtualPath),
+    });
+    return (result?.messages ?? []).some((m) => m.ruleId === testCase.rule);
+  }
   const absolute = join(repoRoot, testCase.file);
   mkdirSync(dirname(absolute), { recursive: true });
   writeFileSync(absolute, testCase.code);
   try {
     const [result] = await eslint.lintFiles([absolute]);
-    const fired = (result?.messages ?? []).some((m) => m.ruleId === testCase.rule);
-    if (fired === testCase.shouldFire) {
-      console.log(`  PASS  ${testCase.label}`);
-    } else {
-      failures += 1;
-      console.error(
-        `  FAIL  ${testCase.label}\n        rule ${testCase.rule} fired=${String(fired)}, expected=${String(testCase.shouldFire)}`,
-      );
-    }
+    return (result?.messages ?? []).some((m) => m.ruleId === testCase.rule);
   } finally {
     rmSync(absolute, { force: true });
+  }
+};
+
+for (const testCase of CASES) {
+  const fired = await runCase(testCase);
+  if (fired === testCase.shouldFire) {
+    console.log(`  PASS  ${testCase.label}`);
+  } else {
+    failures += 1;
+    console.error(
+      `  FAIL  ${testCase.label}\n        rule ${testCase.rule} fired=${String(fired)}, expected=${String(testCase.shouldFire)}`,
+    );
   }
 }
 

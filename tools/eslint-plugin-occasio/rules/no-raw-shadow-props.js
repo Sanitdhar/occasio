@@ -16,8 +16,31 @@ const SHADOW_PROPERTIES = new Set([
   'elevation',
 ]);
 
+/**
+ * The property this node writes, or `null` when it cannot be known without running the code.
+ *
+ * Computed keys are read rather than skipped. `{ ['boxShadow']: … }` and `{ [`elevation`]: … }`
+ * produce exactly the property this rule exists to ban, and skipping every computed key made
+ * the brackets an opt-out — which is the shape of an escape hatch, not of a rule. A key built
+ * from a variable still returns `null`, because there is nothing to compare against; that is a
+ * limit of static analysis rather than a hole anyone can aim for.
+ */
+const staticKeyName = (key) => {
+  /* Deliberately no Identifier branch. In `{ [boxShadow]: 1 }` the identifier is a *reference*
+     — the property written is whatever that variable holds, which may be anything — so reading
+     `key.name` would report a raw shadow prop for code that writes `dataKey`. Only a key whose
+     text is the key qualifies. */
+  if (key.type === 'Literal' && typeof key.value === 'string') return key.value;
+  if (key.type === 'TemplateLiteral' && key.expressions.length === 0) {
+    return key.quasis[0]?.value.cooked ?? null;
+  }
+  return null;
+};
+
 const propertyName = (node) => {
-  if (node.computed) return null;
+  /* An unbracketed key is an Identifier or a string Literal; a bracketed one is any expression,
+     and only the ones with a knowable value are checked. */
+  if (node.computed) return staticKeyName(node.key);
   if (node.key.type === 'Identifier') return node.key.name;
   if (node.key.type === 'Literal' && typeof node.key.value === 'string') return node.key.value;
   return null;
