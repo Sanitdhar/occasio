@@ -1,0 +1,287 @@
+import { describe, expect, it } from '@jest/globals';
+import { evaluate } from './reviewGate.mjs';
+
+/**
+ * The rules that decide whether a merge is allowed, exercised against canned GitHub responses.
+ *
+ * Every one of these was added because a defect got past it, and until now each fix was verified
+ * by running the real gate against a real pull request and reading the output — which proves the
+ * answer for one PR on one day and nothing about the next. The cases below are the situations
+ * that produced those defects, written down.
+ *
+ * They lean one way on purpose. A gate that refuses when it should pass costs a wait; a gate
+ * that passes when it should refuse is a commit nobody read, on `main`. So the uncertain cases —
+ * a missing timestamp, a truncated comparison, a commit that cannot be fetched — all assert
+ * refusal.
+ */
+
+const REPO = 'dharlabs/occasio';
+const PR = '1';
+const BOT = 'coderabbitai[bot]';
+
+const HEAD = 'head000';
+const REVIEWED = 'revd000';
+
+const AT_REVIEW = '2026-09-06T10:00:00Z';
+const AT_HEAD_BEFORE = '2026-09-06T09:00:00Z';
+const AT_HEAD_AFTER = '2026-09-06T11:00:00Z';
+
+/** A file entry as `/compare` reports one. */
+const file = (filename: string, patch = '@@ -1 +1 @@\n-a\n+b') => ({ filename, patch });
+
+/**
+ * Routes are thunks so a test can make one of them throw — a force-pushed commit that has
+ * fallen out of reach is a case the gate has to answer, and it cannot be expressed by a value.
+ *
+ * Object endpoints and list endpoints are kept apart rather than narrowed at the call site: the
+ * two seams `evaluate` takes have different return types, and a single map would need a cast to
+ * satisfy both, which D16 refuses and which would let a mistyped fixture through anyway.
+ */
+type Objects = Record<string, () => unknown>;
+type Lists = Record<string, () => unknown[]>;
+
+type Scenario = {
+  headSha?: string;
+  headAt?: string | null;
+  issueComments?: unknown[];
+  reviewComments?: unknown[];
+  reviews?: unknown[];
+  compare?: Objects;
+  excludedPaths?: string[];
+};
+
+/**
+ * A pull request that has been reviewed, cleanly, with the review newer than the head. Every
+ * test below starts here and breaks exactly one thing, so a failure names its own cause.
+ */
+const run = (scenario: Scenario = {}) => {
+  const headSha = scenario.headSha ?? HEAD;
+  const headAt = scenario.headAt === undefined ? AT_HEAD_BEFORE : scenario.headAt;
+
+  const lists: Lists = {
+    [`/repos/${REPO}/issues/${PR}/comments`]: () =>
+      scenario.issueComments ?? [
+        { user: { login: BOT }, body: '## Walkthrough\n…', created_at: AT_REVIEW },
+      ],
+    [`/repos/${REPO}/pulls/${PR}/comments`]: () => scenario.reviewComments ?? [],
+    [`/repos/${REPO}/pulls/${PR}/reviews`]: () => scenario.reviews ?? [],
+  };
+
+  const objects: Objects = {
+    [`/repos/${REPO}/pulls/${PR}`]: () => ({
+      title: 'a pull request',
+      head: { sha: headSha },
+      base: { ref: 'main' },
+    }),
+    [`/repos/${REPO}/commits/${headSha}/status`]: () => ({
+      statuses: [{ context: 'CodeRabbit', state: 'success', description: 'Review completed' }],
+    }),
+    [`/repos/${REPO}/commits/${headSha}`]: () => ({ commit: { committer: { date: headAt } } }),
+    ...(scenario.compare ?? {}),
+  };
+
+  /* An unrouted path is a broken fixture, not an empty answer. Returning undefined here would
+     quietly exercise the gate's fail-closed paths and pass for the wrong reason. */
+  const pick = <T>(table: Record<string, () => T>, path: string): T => {
+    const route = table[path];
+    if (route === undefined) throw new Error(`unrouted: ${path}`);
+    return route();
+  };
+
+  return evaluate({
+    api: (path) => Promise.resolve(pick(objects, path)),
+    apiAll: (path) => Promise.resolve(pick(lists, path)),
+    repo: REPO,
+    pr: PR,
+    excludedPaths: scenario.excludedPaths ?? ['package-lock.json', '**/__screenshots__/**'],
+  });
+};
+
+describe('the review gate', () => {
+  it('passes a reviewed pull request whose head predates the review', async () => {
+    /* The baseline every other case departs from. If this ever fails, nothing below means
+       what it says. */
+    expect(await run()).toMatchObject({ reviewed: true, stale: false, ok: true });
+  });
+
+  it('refuses a pull request with no evidence of any review', async () => {
+    const v = await run({ issueComments: [] });
+    expect(v).toMatchObject({ reviewed: false, ok: false });
+  });
+
+  it('refuses when the head is newer than the review', async () => {
+    /*
+     * The #134 case: a 374-line commit changing who may read invitation contact details, pushed
+     * eight minutes after the review it appeared to have. Every other signal stayed true.
+     */
+    const v = await run({ headAt: AT_HEAD_AFTER });
+    expect(v).toMatchObject({ reviewed: true, stale: true, ok: false });
+  });
+
+  describe('what may date a review', () => {
+    it('does not let "Review limit reached" refresh a stale review', async () => {
+      /*
+       * That comment is posted by the reviewer, after the commit, and says a review did *not*
+       * happen. Counting it as evidence would let the one comment meaning "unreviewed" certify
+       * a stale review as fresh — the exact inversion this gate exists to prevent.
+       */
+      const v = await run({
+        headAt: AT_HEAD_AFTER,
+        issueComments: [
+          { user: { login: BOT }, body: '## Walkthrough\n…', created_at: AT_REVIEW },
+          {
+            user: { login: BOT },
+            body: 'Review limit reached',
+            created_at: '2026-09-06T12:00:00Z',
+          },
+        ],
+      });
+      expect(v).toMatchObject({ rateLimited: true, stale: true, ok: false });
+      expect(v.lastReviewAt).toBe(AT_REVIEW);
+    });
+
+    it('accepts a full review that finished after the head commit', async () => {
+      /* A clean full review produces no walkthrough, no finding and no review record — only a
+         note edited into its own acknowledgement. #144 was stuck on exactly that. */
+      const v = await run({
+        headAt: AT_HEAD_AFTER,
+        issueComments: [
+          { user: { login: BOT }, body: '## Walkthrough\n…', created_at: AT_REVIEW },
+          {
+            user: { login: BOT },
+            body: 'A full review will evaluate the current head.\n\nFull review finished.',
+            created_at: '2026-09-06T12:00:00Z',
+          },
+        ],
+      });
+      expect(v).toMatchObject({ stale: false, ok: true });
+      expect(v.fullReviewAt).toBe('2026-09-06T12:00:00Z');
+    });
+
+    it('does not count a review that has not been submitted', async () => {
+      /* A PENDING review has no `submitted_at`. Counting it reports "reviewed" before the
+         review exists. */
+      const v = await run({
+        issueComments: [],
+        reviews: [{ user: { login: BOT }, submitted_at: null, commit_id: HEAD }],
+      });
+      expect(v).toMatchObject({ submitted: 0, reviewed: false, ok: false });
+    });
+  });
+
+  describe('Claude as the fallback reviewer (D42)', () => {
+    it('counts Claude only when CodeRabbit was actually rate limited', async () => {
+      const withoutLimit = await run({
+        issueComments: [{ user: { login: 'claude[bot]' }, body: 'review', created_at: AT_REVIEW }],
+      });
+      /* Without the conjunct, any comment the app ever posts — a reply in a thread, an answer to
+         a question — satisfied the gate, so the fallback reviewer doubled as a way to skip
+         review entirely. */
+      expect(withoutLimit).toMatchObject({ claudeReviewed: false, reviewed: false, ok: false });
+
+      const withLimit = await run({
+        issueComments: [
+          { user: { login: BOT }, body: 'Review limit reached', created_at: AT_HEAD_BEFORE },
+          { user: { login: 'claude[bot]' }, body: 'review', created_at: AT_REVIEW },
+        ],
+      });
+      expect(withLimit).toMatchObject({ claudeReviewed: true, reviewed: true, ok: true });
+    });
+  });
+
+  describe('a rebase is not a change to the code', () => {
+    const compareOf = (sha: string, files: unknown) => ({
+      [`/repos/${REPO}/compare/main...${sha}?per_page=300`]: () => ({ files }),
+    });
+
+    const rebased = (headFiles: unknown, reviewedFiles: unknown, excludedPaths?: string[]) =>
+      run({
+        headAt: AT_HEAD_AFTER,
+        reviews: [{ user: { login: BOT }, submitted_at: AT_REVIEW, commit_id: REVIEWED }],
+        compare: { ...compareOf(HEAD, headFiles), ...compareOf(REVIEWED, reviewedFiles) },
+        ...(excludedPaths === undefined ? {} : { excludedPaths }),
+      });
+
+    it('passes when the head proposes the same diff the review read', async () => {
+      const files = [file('packages/ui/src/a.ts'), file('packages/ui/src/b.ts')];
+      expect(await rebased(files, files)).toMatchObject({ rebasedOnly: true, ok: true });
+    });
+
+    it('passes when the base absorbed one of the files, leaving a smaller change', async () => {
+      /* A subset, not an equality. Dropping a file cannot introduce code nobody read, and
+         CodeRabbit will not clear it either — asked again it answers "No files to review". */
+      const reviewedFiles = [file('packages/ui/src/a.ts'), file('packages/ui/src/b.ts')];
+      expect(await rebased([file('packages/ui/src/a.ts')], reviewedFiles)).toMatchObject({
+        rebasedOnly: true,
+        ok: true,
+      });
+    });
+
+    it('refuses when a line actually changed', async () => {
+      const reviewedFiles = [file('packages/ui/src/a.ts', '@@ -1 +1 @@\n-a\n+b')];
+      const headFiles = [file('packages/ui/src/a.ts', '@@ -1 +1 @@\n-a\n+c')];
+      expect(await rebased(headFiles, reviewedFiles)).toMatchObject({
+        rebasedOnly: false,
+        stale: true,
+        ok: false,
+      });
+    });
+
+    it('refuses a comparison the API truncated, even when the excess is all excluded', async () => {
+      /*
+       * The #147 finding. Filtering before the cap check lets excluded entries hide the
+       * truncation: 300 files of which 40 are lockfile-and-screenshot noise leaves 260, under
+       * the cap, and the check passes on a comparison that was cut short — with the unlisted
+       * change being the one nobody reviewed.
+       */
+      const bulk = Array.from({ length: 260 }, (_, i) => file(`packages/ui/src/f${String(i)}.ts`));
+      const noise = Array.from({ length: 40 }, (_, i) =>
+        file(`packages/ui/src/__screenshots__/s${String(i)}.png`),
+      );
+      const truncated = [...bulk, ...noise];
+      expect(truncated).toHaveLength(300);
+
+      const v = await rebased(truncated, truncated);
+      expect(v).toMatchObject({ rebasedOnly: false, stale: true, ok: false });
+    });
+
+    it('refuses a comparison with no file list at all', async () => {
+      /* An absent list fingerprints as the empty string, and so does another absent list —
+         two unknowns matching each other and reading as "already reviewed". */
+      expect(await rebased(undefined, undefined)).toMatchObject({ rebasedOnly: false, ok: false });
+    });
+
+    it('refuses a file it cannot describe', async () => {
+      /* Neither a patch nor a blob sha: both sides would serialise as `binary:unknown`, which
+         is one unknown matching another. */
+      const opaque = [{ filename: 'assets/logo.png' }];
+      expect(await rebased(opaque, opaque)).toMatchObject({ rebasedOnly: false, ok: false });
+    });
+
+    it('refuses when the reviewed commit can no longer be fetched', async () => {
+      /* A force push can put it out of reach. Unknown is not "unchanged". */
+      const files = [file('packages/ui/src/a.ts')];
+      const v = await run({
+        headAt: AT_HEAD_AFTER,
+        reviews: [{ user: { login: BOT }, submitted_at: AT_REVIEW, commit_id: REVIEWED }],
+        compare: {
+          [`/repos/${REPO}/compare/main...${HEAD}?per_page=300`]: () => ({ files }),
+          [`/repos/${REPO}/compare/main...${REVIEWED}?per_page=300`]: () => {
+            throw new Error('404 Not Found');
+          },
+        },
+      });
+      expect(v).toMatchObject({ rebasedOnly: false, stale: true, ok: false });
+    });
+  });
+
+  it('refuses when the head commit carries no date', async () => {
+    /*
+     * Fails closed. Treating an absent timestamp as "not stale" would make every unknown a
+     * quiet approval — the failure the whole gate exists to answer, reintroduced by its own
+     * freshness check.
+     */
+    const v = await run({ headAt: null });
+    expect(v).toMatchObject({ headAt: null, stale: true, ok: false });
+  });
+});
