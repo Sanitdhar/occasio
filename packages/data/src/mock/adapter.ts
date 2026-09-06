@@ -303,7 +303,7 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
     return state;
   };
 
-  const commit = async (current: MockState, patch: Partial<MockTables>): Promise<void> => {
+  const commit = async (current: MockState, patch: Partial<MockTables>): Promise<boolean> => {
     /*
      * A write belongs to the state it was read from. `resetDemoData` replaces `state` wholesale,
      * and every operation is holding its `current` across a simulated delay of up to 240 ms — so
@@ -316,9 +316,10 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
      * longer exists, so there is nothing to merge it into and nothing to tell the caller — a
      * reset is a discard, and this write is part of what was discarded.
      */
-    if (current !== state) return;
+    if (current !== state) return false;
     current.tables = { ...current.tables, ...patch };
     await persist(current);
+    return true;
   };
 
   /**
@@ -606,7 +607,7 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
       id,
     );
 
-  const saveMembership = (current: MockState, next: MembershipRow): Promise<void> =>
+  const saveMembership = (current: MockState, next: MembershipRow): Promise<boolean> =>
     commit(current, {
       memberships: replace(current.tables.memberships, (row) => row.id === next.id, next),
     });
@@ -1007,7 +1008,46 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
    * Registered listeners. `subscribe()` below hands them out and takes them back; delivering to
    * them is #36, which owns the emitter and the tests that prove an unsubscribe leaks nothing.
    */
-  const gossipListeners = new Set<(change: GossipChange) => void>();
+  /**
+   * A subscription is a read, so it carries the scope the read had.
+   *
+   * Tenant, because a listener on one event must never see another's posts — the same rule every
+   * query obeys, and the one place it would be easiest to forget, since a listener is registered
+   * once and fires forever afterwards.
+   *
+   * Statuses, resolved through `visibleModeration` at subscribe time rather than taken from the
+   * query as written: a guest asking to watch `pending` would otherwise receive other people's
+   * unapproved posts live, which is the moderation guarantee (D3) leaking through the one door
+   * that is not a query.
+   */
+  type GossipSubscription = {
+    readonly tenantId: TenantId;
+    readonly statuses: readonly ModerationStatus[];
+    readonly listener: (change: GossipChange) => void;
+  };
+
+  const gossipListeners = new Set<GossipSubscription>();
+
+  /**
+   * Delivered synchronously, after the write has been persisted.
+   *
+   * Synchronous because the alternative -- a microtask or a timer -- makes "the post appeared"
+   * something a test has to wait for and a screen has to tolerate arriving late. Iterating a
+   * copy because a listener is entitled to unsubscribe from inside its own callback, which is
+   * what a React effect does when the change it just received unmounts the component.
+   */
+  const emitGossip = (tenant: TenantId, change: GossipChange): void => {
+    for (const subscription of [...gossipListeners]) {
+      if (subscription.tenantId !== tenant) continue;
+      /* A deletion has no status to filter on. Nothing deletes a gossip post today -- removal
+         is `hidden`, which is an update -- so this is the branch that keeps the filter honest
+         rather than one anything reaches. */
+      if (change.kind !== 'deleted' && !subscription.statuses.includes(change.item.status)) {
+        continue;
+      }
+      subscription.listener(change);
+    }
+  };
 
   const gossip: DataAdapter['gossip'] = {
     list: async (
@@ -1073,8 +1113,14 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
         report_count: 0,
         created_at: nowIso(),
       };
-      await commit(current, { gossipPosts: [...current.tables.gossipPosts, row] });
-      return toGossipPost(row);
+      const created = toGossipPost(row);
+      /* Only when the write actually landed. `commit` discards a write whose state a reset has
+         replaced, and announcing a post that was never stored would put it on every open board
+         until the next reload contradicted it. */
+      if (await commit(current, { gossipPosts: [...current.tables.gossipPosts, row] })) {
+        emitGossip(tenantId, { kind: 'created', item: created });
+      }
+      return created;
     },
 
     moderate: async (
@@ -1102,10 +1148,26 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
         moderated_at: nowIso(),
         rejection_reason: reason,
       };
-      await commit(current, {
-        gossipPosts: replace(current.tables.gossipPosts, (candidate) => candidate.id === id, next),
-      });
-      return toGossipPost(next);
+      const moderated = toGossipPost(next);
+      if (
+        await commit(current, {
+          gossipPosts: replace(
+            current.tables.gossipPosts,
+            (candidate) => candidate.id === id,
+            next,
+          ),
+        })
+      ) {
+        /*
+         * The demo this feature exists for: a post in the queue, approved, appearing on the
+         * board without a refresh. It is `updated` rather than `created` even though it is new
+         * to the approved list, because the post existed and its status changed -- a board
+         * receiving `updated` for something it has not got can insert it, and a queue receiving
+         * it for something it has can remove it, which is not true the other way round.
+         */
+        emitGossip(tenantId, { kind: 'updated', item: moderated });
+      }
+      return moderated;
     },
 
     /**
@@ -1128,9 +1190,19 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
         status:
           row.status === 'approved' && reportCount >= REPORT_HIDE_THRESHOLD ? 'hidden' : row.status,
       };
-      await commit(current, {
-        gossipPosts: replace(current.tables.gossipPosts, (candidate) => candidate.id === id, next),
-      });
+      if (
+        await commit(current, {
+          gossipPosts: replace(
+            current.tables.gossipPosts,
+            (candidate) => candidate.id === id,
+            next,
+          ),
+        })
+      ) {
+        /* A report can auto-hide a post (D31), and the board holding it has to hear about that
+           as promptly as it would hear about a moderator's decision. */
+        emitGossip(tenantId, { kind: 'updated', item: toGossipPost(next) });
+      }
     },
 
     /**
@@ -1142,16 +1214,25 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
      */
     subscribe: async (
       tenantId: TenantId,
-      _query: GossipQuery,
+      query: GossipQuery,
       listener: (change: GossipChange) => void,
     ): Promise<Unsubscribe> => {
-      await scope(tenantId, 'gossip.subscribe');
-      gossipListeners.add(listener);
+      const { membership } = await scope(tenantId, 'gossip.subscribe');
+      const subscription: GossipSubscription = {
+        tenantId,
+        statuses: visibleModeration(membership, query.statuses),
+        listener,
+      };
+      gossipListeners.add(subscription);
+
       let closed = false;
       return () => {
+        /* Safe to call twice, which React effects do -- and it removes the one registration
+           rather than every registration by this callback, so the same function subscribed to
+           two events keeps the other. */
         if (closed) return;
         closed = true;
-        gossipListeners.delete(listener);
+        gossipListeners.delete(subscription);
       };
     },
   };
