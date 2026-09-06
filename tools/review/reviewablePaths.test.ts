@@ -71,6 +71,16 @@ describe('matchesGlob', () => {
     expect(matchesGlob('**/__screenshots__/**', 'packages/ui/src/Button.tsx')).toBe(false);
   });
 
+  it('expands a star that follows a literal dot', () => {
+    /* `config.*` escapes to `config\\.` before the star is handled. A rule that skipped any
+       star preceded by a dot — written to protect globstar output — skipped this one too, and
+       the pattern compiled to a regex matching repeated dots rather than an extension. */
+    expect(matchesGlob('config.*', 'config.json')).toBe(true);
+    expect(matchesGlob('config.*', 'config.a.b')).toBe(true);
+    expect(matchesGlob('config.*', 'config')).toBe(false);
+    expect(matchesGlob('config.*', 'configxjson')).toBe(false);
+  });
+
   it('keeps a single * inside one segment', () => {
     /* The difference that matters: `*.json` must not swallow `a/b.json`, or one careless
        pattern stops the gate guarding a whole tree. */

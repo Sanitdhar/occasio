@@ -187,14 +187,18 @@ const effectiveDiff = async (sha) => {
      * something that cannot arrive. Missing config means nothing is excluded, which errs toward
      * asking for more review rather than less.
      */
-    const files = (comparison.files ?? []).filter((f) =>
-      isReviewable(excludedPaths, String(f.filename ?? '')),
-    );
+    const reported = comparison.files;
     /* An absent list fingerprints as the empty string, and so does another absent list. */
-    if (!Array.isArray(comparison.files)) return null;
-    /* The endpoint stops at 300 files; at the cap the list is truncated, so a file nobody
-       listed can differ while the two fingerprints match. */
-    if (files.length >= COMPARE_FILE_CAP) return null;
+    if (!Array.isArray(reported)) return null;
+    /*
+     * The cap is checked against what the endpoint reported, before anything is filtered out.
+     * Checking the filtered list instead lets excluded entries hide the truncation: 300 files
+     * of which 40 are lockfile-and-screenshot noise leaves 260, under the cap, and the check
+     * passes on a comparison that was cut short — with the unlisted change being the one nobody
+     * reviewed.
+     */
+    if (reported.length >= COMPARE_FILE_CAP) return null;
+    const files = reported.filter((f) => isReviewable(excludedPaths, String(f.filename ?? '')));
     /* A file with neither a patch nor a blob sha is a file this cannot describe. Both would
        serialise as `binary:unknown`, which is one unknown matching another. */
     if (!files.every(isDescribable)) return null;

@@ -58,14 +58,30 @@ export const parseExcludedPaths = (yaml) => {
  * @returns {boolean}
  */
 export const matchesGlob = (pattern, path) => {
+  /*
+   * Placeholders, not a lookbehind.
+   *
+   * The first version escaped the regex characters and then skipped any `*` preceded by a dot,
+   * to avoid disturbing the `.*` that globstar expansion produces. That also skipped the `*` in
+   * `config.*` — whose preceding dot is an escaped literal — so the pattern compiled to
+   * `config\.*`, a regex matching `config`, `config.`, `config..` and nothing anyone wanted.
+   *
+   * Expanding into markers that contain no regex syntax removes the ambiguity: by the time the
+   * single-star rule runs there is no globstar output left for it to misread.
+   */
+  const GLOBSTAR_SLASH = '\u0000gss\u0000';
+  const GLOBSTAR = '\u0000gs\u0000';
+
   const source = pattern
-    .split('')
-    .map((char) => (/[.+^${}()|[\]\\]/.test(char) ? `\\${char}` : char))
-    .join('')
-    /* `**` first, so the single-star rule below does not consume half of it. */
-    .replace(/\*\*\//g, '(?:.*/)?')
-    .replace(/\*\*/g, '.*')
-    .replace(/(?<!\.)\*/g, '[^/]*');
+    .replace(/\*\*\//g, GLOBSTAR_SLASH)
+    .replace(/\*\*/g, GLOBSTAR)
+    /* Escape everything with meaning in a regex, `*` included — it is restored below. */
+    .replace(/[.+^${}()|[\]\\*?]/g, (char) => `\\${char}`)
+    /* The single star, now unambiguous: one segment only, so `*.json` cannot cross a slash. */
+    .replace(/\\\*/g, '[^/]*')
+    .replace(GLOBSTAR_SLASH, '(?:.*/)?')
+    .replace(GLOBSTAR, '.*');
+
   return new RegExp(`^${source}$`).test(path);
 };
 
