@@ -22,6 +22,21 @@ describe('normaliseJoinCode', () => {
     expect(normaliseJoinCode('---')).toBeNull();
   });
 
+  it('answers null for input that was nothing but invisible characters', () => {
+    /*
+     * A different path to the same line, and the one that arrives by accident: a field filled by
+     * pasting from a document can hold format characters and no visible text at all, so it looks
+     * empty to the person and is not empty to a string comparison. Stripping them has to reach
+     * `null` rather than `''`, or such a paste matches a row whose code is blank.
+     *
+     * The class test above only ever puts these characters *inside* `SANRIY26`, so it cannot
+     * reach this boundary.
+     */
+    expect(normaliseJoinCode('\u2060')).toBeNull();
+    expect(normaliseJoinCode('\u200B\u200C\u200D\uFEFF')).toBeNull();
+    expect(normaliseJoinCode('\u00AD \u2060 - \u200E')).toBeNull();
+  });
+
   it('strips everything invisible, not a list of the ones anybody thought of', () => {
     /*
      * A code copied out of a PDF or a chat message arrives carrying characters with no width at
@@ -80,5 +95,18 @@ describe('joinCodeMatches', () => {
   it('refuses an empty input against a real code', () => {
     expect(joinCodeMatches('SANRIY26', '')).toBe(false);
     expect(joinCodeMatches('SANRIY26', '  -  ')).toBe(false);
+    /* Invisible-only, which is what an accidental paste produces and what an empty-looking field
+       actually contains. */
+    expect(joinCodeMatches('SANRIY26', '\u2060\u200B')).toBe(false);
+  });
+
+  it('refuses invisible-only input against an event whose code is blank', () => {
+    /*
+     * Both sides reduce to nothing, which is exactly the pair that must not be equal. A stored
+     * empty string is not in the fixtures, but it is one bad row away, and `null` on the left of
+     * the comparison is what keeps that row unjoinable rather than universally joinable.
+     */
+    expect(joinCodeMatches('', '\u2060')).toBe(false);
+    expect(joinCodeMatches('   ', '')).toBe(false);
   });
 });
