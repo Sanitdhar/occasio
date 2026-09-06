@@ -104,7 +104,15 @@ describe('the fixture set', () => {
       'maple-1999',
       'sanit-riyanks',
     ]);
-    expect(new Set(seed.tenants.map((t) => t.kind)).size).toBe(4);
+    /* Which slug is which kind, not merely that four kinds appear. Distinctness alone is
+       satisfied by swapping the wedding and the festival, and every screen that branches on
+       `kind` would then be exercised against the wrong fixture. */
+    expect(Object.fromEntries(seed.tenants.map((t) => [t.slug, t.kind]))).toEqual({
+      'sanit-riyanks': 'wedding',
+      anandhara: 'festival',
+      'devcon-25': 'conference',
+      'maple-1999': 'reunion',
+    });
   });
 
   it('gives every tenant exactly one config, and no config an orphan tenant', () => {
@@ -131,14 +139,23 @@ describe('the fixture set', () => {
     }
   });
 
-  it('never lists a tab that is not a feature', () => {
-    /* The nav filters on `features[k].enabled` at render, so listing a disabled feature is
-       legitimate and deliberate here. Listing something that is not a feature at all is not:
-       it renders as nothing, in a bar where a missing tab looks like a bug in the app. */
+  it('never lists a tab that is not a feature, in either config', () => {
+    /*
+     * The nav filters on `features[k].enabled` at render, so listing a disabled feature is
+     * legitimate and deliberate here. Listing something that is not a feature at all is not: it
+     * renders as nothing, in a bar where a missing tab looks like a bug in the app.
+     *
+     * Both configs, independently. Reading `published_config ?? draft_config` would let a
+     * broken draft through whenever a valid published one existed — and the draft is the one
+     * the theme editor renders, so it is the half a person sees first.
+     */
     for (const row of seed.tenantConfigs) {
-      const tabs = (row.published_config ?? row.draft_config).nav.tabs;
-      expect(new Set(tabs).size).toBe(tabs.length);
-      for (const tab of tabs) expect(FEATURE_KEYS).toContain(tab);
+      for (const config of [row.draft_config, row.published_config]) {
+        if (config === null) continue;
+        const tabs = config.nav.tabs;
+        expect(new Set(tabs).size).toBe(tabs.length);
+        for (const tab of tabs) expect(FEATURE_KEYS).toContain(tab);
+      }
     }
   });
 
