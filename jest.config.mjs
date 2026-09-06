@@ -90,6 +90,8 @@ export default {
         '^react-native$': 'react-native-web',
         '^expo-image$': '<rootDir>/test/stubs/expo-image.tsx',
         '^expo-linear-gradient$': '<rootDir>/test/stubs/expo-linear-gradient.tsx',
+        '^react-native-safe-area-context$':
+          '<rootDir>/test/stubs/react-native-safe-area-context.tsx',
       },
       /*
        * `.web` first, so the platform split resolves the way Metro resolves it for web.
