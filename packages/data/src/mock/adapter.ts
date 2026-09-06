@@ -246,16 +246,38 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
     nextId: 1,
   });
 
-  const persist = async (current: MockState): Promise<void> => {
-    await storage.write(
-      storageKey,
-      serialiseSnapshot({
-        version: MOCK_SNAPSHOT_VERSION,
-        deviceId: current.deviceId,
-        nextId: current.nextId,
-        tables: current.tables,
-      }),
+  /**
+   * The tail of the write chain. Every `persist` joins it, so writes reach the store in the
+   * order they were issued rather than in whatever order the store finishes them.
+   *
+   * Ordering is what makes the reset guard in `commit` complete. Without it the guard only
+   * closes half the race: a commit that passed the check can still have its `storage.write`
+   * in flight when `resetDemoData` writes the fresh snapshot, and if the older write finishes
+   * last the pre-reset tables are what survive on disk. The guard decides *whether* to write;
+   * this decides *when*, and both are needed to say the reset wins.
+   */
+  let writes: Promise<void> = Promise.resolve();
+
+  /**
+   * Not `async`: the payload is serialised and the write is queued in the same synchronous turn
+   * as the call. That is what gives the ordering its meaning — a commit that passed the guard
+   * has necessarily queued before `resetDemoData` could change `state` and queue its own write,
+   * so the reset's snapshot is always the later one.
+   */
+  const persist = (current: MockState): Promise<void> => {
+    const payload = serialiseSnapshot({
+      version: MOCK_SNAPSHOT_VERSION,
+      deviceId: current.deviceId,
+      nextId: current.nextId,
+      tables: current.tables,
+    });
+    /* A rejected write must not poison the queue for every write after it, but the caller that
+       issued it still sees its own failure. */
+    writes = writes.then(
+      () => storage.write(storageKey, payload),
+      () => storage.write(storageKey, payload),
     );
+    return writes;
   };
 
   const readState = async (): Promise<MockState> => {

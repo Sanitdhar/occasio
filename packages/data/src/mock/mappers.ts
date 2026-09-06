@@ -329,5 +329,13 @@ export const serialiseSnapshot = (snapshot: MockSnapshot): string => JSON.string
  * timestamps are ISO strings rather than `Date`s, and there is no `undefined` in a row — a
  * nullable column is `null`. It lives here because it is a cast, and this is one of the two
  * files where a cast is legal.
+ *
+ * `T extends object` rather than a runtime check on the stringify result. `JSON.stringify`
+ * answers `undefined` — not the string — for `undefined` itself, a function and a symbol, and
+ * `JSON.parse(undefined)` throws. TypeScript's lib types the return as plain `string`, so the
+ * compiler cannot see that, and a guard against it is a branch the linter can prove is dead
+ * while the runtime can still reach it. Constraining the parameter removes the case instead of
+ * catching it: an object and an array always stringify to a string, and nothing else is a thing
+ * this function was ever meant to copy.
  */
-export const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+export const cloneJson = <T extends object>(value: T): T => JSON.parse(JSON.stringify(value)) as T;

@@ -217,4 +217,96 @@ describe('resetDemoData against a write already in flight', () => {
 
     expect(after.items.some((row) => row.invitedEmail === 'late@example.test')).toBe(false);
   });
+
+  it('never leaves two writes in flight, so the reset is the one that lands', async () => {
+    /*
+     * The half of the race the `commit` guard does not close. The guard decides *whether* a
+     * superseded write happens; it cannot decide when a write already handed to the store
+     * finishes. With two writes in flight the store may complete them in either order, and if
+     * the older finishes last the pre-reset tables survive on disk -- the same
+     * invisible-until-reload corruption, reached by a different route.
+     *
+     * So the store here holds every write open until released, and they are released
+     * newest-first: the completion order a slow store is entitled to produce, and the one that
+     * loses the data. `maxInFlight` is the assertion that matters -- while writes are
+     * serialised, the store is never in a position to invert anything.
+     */
+    let stored: string | null = null;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const gates: (() => void)[] = [];
+    const heldStorage = {
+      read: () => Promise.resolve(stored),
+      write: async (_key: string, value: string) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise<void>((resolve) => {
+          gates.push(resolve);
+        });
+        stored = value;
+        inFlight -= 1;
+      },
+      remove: () => {
+        stored = null;
+        return Promise.resolve();
+      },
+    };
+
+    const settle = async (): Promise<void> => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    };
+    /** Waits for a condition rather than for a fixed number of turns, which is guesswork. */
+    const waitFor = async (what: string, ready: () => boolean): Promise<void> => {
+      for (let guard = 0; guard < 50; guard += 1) {
+        if (ready()) return;
+        await settle();
+      }
+      throw new Error(`timed out waiting for ${what}`);
+    };
+
+    /** Finishes the outstanding writes newest-first, including any queued while draining. */
+    const drainNewestFirst = async (): Promise<void> => {
+      for (let guard = 0; guard < 20; guard += 1) {
+        const gate = gates.pop();
+        if (gate === undefined) return;
+        gate();
+        await settle();
+      }
+      throw new Error('writes never stopped queueing');
+    };
+
+    const adapter = createMockAdapter({
+      currentUserId: ADMIN,
+      seed: SEED,
+      storage: heldStorage,
+      latency: { minMs: 0, maxMs: 0 },
+    });
+
+    /* First load seeds the store; let that write finish so it is not part of the race. */
+    const ready = adapter.ready();
+    await waitFor('the seeding write', () => gates.length > 0);
+    await drainNewestFirst();
+    await ready;
+
+    /* The invite runs all the way into its write, which is then held open. */
+    const invite = adapter.memberships.invite(WEDDING, {
+      email: 'late@example.test',
+      phone: null,
+      role: 'attendee',
+    });
+    await waitFor("the invite's write to reach the store", () => gates.length === 1);
+
+    /* The reset lands while that write is still in flight. */
+    const reset = adapter.resetDemoData();
+    await settle();
+
+    await drainNewestFirst();
+    await Promise.all([invite.catch(() => undefined), reset]);
+
+    expect(maxInFlight).toBe(1);
+    expect(stored).not.toBeNull();
+    expect(stored).not.toContain('late@example.test');
+  });
 });
