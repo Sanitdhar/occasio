@@ -19,20 +19,39 @@ const USER = { id: userId('u_sanit'), email: 'sanit@example.com' };
 
 const adapterOn = (storage: MockStorage) => createMockAuthAdapter({ user: USER, storage });
 
+const tick = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
- * The same store, answering out of order.
+ * The same store, with one operation slower than the other.
  *
- * Writes are made slower than removes, so an unqueued sign-in and sign-out started together land
- * backwards — which is exactly the interleaving the queue exists to prevent and which a store
- * that answers instantly can never produce.
+ * Which one has to be slow depends on the order the transitions are started in, and getting that
+ * wrong produces a test that passes without the queue. Delaying writes only makes "sign in, then
+ * sign out" land backwards — but for "sign out, then sign in" the same delay produces the right
+ * answer by accident, because the immediate remove happens first and the late write is the one
+ * that should win anyway. That case needs the *remove* delayed, so an unqueued run has the late
+ * remove wipe a completed sign-in.
+ *
+ * A store that answers instantly can never produce either interleaving.
  */
-const slowStorage = (inner: MockStorage): MockStorage => ({
+const slowStorage = (inner: MockStorage, slow: 'write' | 'remove'): MockStorage => ({
   read: (k) => inner.read(k),
   write: async (k, v) => {
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    if (slow === 'write') await tick(20);
     await inner.write(k, v);
   },
-  remove: (k) => inner.remove(k),
+  remove: async (k) => {
+    if (slow === 'remove') await tick(20);
+    await inner.remove(k);
+  },
+});
+
+/** Fails whichever operation it is told to, so a rejected transition can be observed. */
+const failingStorage = (inner: MockStorage, failing: 'write' | 'remove'): MockStorage => ({
+  read: (k) => inner.read(k),
+  write: (k, v) =>
+    failing === 'write' ? Promise.reject(new Error('the disk, probably')) : inner.write(k, v),
+  remove: (k) =>
+    failing === 'remove' ? Promise.reject(new Error('the disk, probably')) : inner.remove(k),
 });
 
 /** Records what a listener heard, so ordering and duplication are both visible. */
@@ -192,7 +211,9 @@ describe('the mock auth adapter', () => {
        * Nothing on screen disagrees while it happens, which is what makes it worth a test: the
        * in-memory session says signed out, and the late `SIGNED_IN` carries that same null.
        */
-      const storage = slowStorage(createMemoryStorage());
+      /* Writes delayed: unqueued, the sign-in's write lands after the sign-out's remove and
+         puts the session back. */
+      const storage = slowStorage(createMemoryStorage(), 'write');
       const auth = adapterOn(storage);
 
       const signingIn = auth.signInWithOAuth('google');
@@ -205,15 +226,49 @@ describe('the mock auth adapter', () => {
     });
 
     it('ends signed in when signing out is what finished first', async () => {
-      /* The mirror image, so the queue is shown to preserve order rather than to favour one
-         outcome. */
-      const storage = slowStorage(createMemoryStorage());
+      /*
+       * The mirror image, so the queue is shown to preserve order rather than to favour one
+       * outcome — and with the *remove* delayed rather than the write. With writes delayed this
+       * case passes without a queue at all: the immediate remove goes first and the late write is
+       * the one that should win anyway, so it proves nothing. Delaying the remove is what makes
+       * an unqueued run wipe a sign-in that had already completed.
+       */
+      const storage = slowStorage(createMemoryStorage(), 'remove');
       const auth = adapterOn(storage);
 
       const signingOut = auth.signOut();
       const signingIn = auth.signInWithOAuth('google');
       await Promise.all([signingOut, signingIn]);
 
+      expect(await auth.getSession()).not.toBeNull();
+      expect(await adapterOn(storage).getSession()).not.toBeNull();
+    });
+  });
+
+  describe('when storage refuses', () => {
+    it('does not report a sign-in that was never stored', async () => {
+      /*
+       * Assigning the session before persisting it leaves the adapter reporting a signed-in user
+       * that nothing has written: the call rejects, a screen shows the failure, and `getSession`
+       * contradicts it — until a reload quietly signs the person out again. Storage is the
+       * durable answer, so storage decides.
+       */
+      const auth = adapterOn(failingStorage(createMemoryStorage(), 'write'));
+
+      await expect(auth.signInWithOAuth('google')).rejects.toThrow();
+      expect(await auth.getSession()).toBeNull();
+    });
+
+    it('does not report a sign-out that did not happen', async () => {
+      /* The same in reverse, and the worse direction: reporting signed out while storage still
+         holds the session means the next reload signs the person back in. */
+      const storage = createMemoryStorage();
+      await adapterOn(storage).signInWithOAuth('google');
+
+      const auth = adapterOn(failingStorage(storage, 'remove'));
+      await auth.getSession();
+
+      await expect(auth.signOut()).rejects.toThrow();
       expect(await auth.getSession()).not.toBeNull();
       expect(await adapterOn(storage).getSession()).not.toBeNull();
     });

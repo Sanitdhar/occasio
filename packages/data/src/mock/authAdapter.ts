@@ -152,20 +152,35 @@ export const createMockAuthAdapter = (options: MockAuthOptions): AuthAdapter => 
         }
 
         await restore();
+
         /* Field by field, not a spread. `MockAuthOptions['user']` is structural, so an object
            carrying `role: 'owner'` satisfies it — and a spread would put that role into the live
            session and persist it. The parse on the way back out sanitises a *stored* session;
            this is the same rule applied on the way in, where it is needed first. */
-        session = { user: { id: options.user.id, email: options.user.email }, expiresAt: null };
-        await storage.write(key, JSON.stringify(session));
+        const next: AuthSession = {
+          user: { id: options.user.id, email: options.user.email },
+          expiresAt: null,
+        };
+
+        /*
+         * Persisted before it is believed. Assigning first leaves the adapter reporting a signed
+         * in user that nothing has stored — so the call rejects, a screen shows the failure, and
+         * `getSession` disagrees with it until a reload quietly signs the person out again.
+         * Storage is the durable answer, so it decides.
+         */
+        await storage.write(key, JSON.stringify(next));
+        session = next;
         emit('SIGNED_IN', [...listeners]);
       }),
 
     signOut: () =>
       serialise(async () => {
         await restore();
-        session = null;
+        /* The same order in reverse: a remove that fails must leave the session standing, or the
+           app reports signed out while storage still holds the session and the next reload
+           signs the person back in. */
         await storage.remove(key);
+        session = null;
         emit('SIGNED_OUT', [...listeners]);
       }),
   };
