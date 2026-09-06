@@ -121,7 +121,7 @@ import {
   type Random,
   type Sleep,
 } from './latency';
-import { approvalRequestId, parseSnapshot, serialiseSnapshot } from './mappers';
+import { approvalRequestId, cloneJson as clone, parseSnapshot, serialiseSnapshot } from './mappers';
 import { numericKey, paginate, timestampKey } from './paging';
 import type { MockStorage } from './storage';
 import {
@@ -219,8 +219,6 @@ const REPORT_HIDE_THRESHOLD = 3;
 
 const QUIET_HOURS = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
-const clone = <T>(value: T): T => structuredClone(value);
-
 const trimmed = (value: string): string => value.trim();
 
 export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
@@ -283,6 +281,19 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
   };
 
   const commit = async (current: MockState, patch: Partial<MockTables>): Promise<void> => {
+    /*
+     * A write belongs to the state it was read from. `resetDemoData` replaces `state` wholesale,
+     * and every operation is holding its `current` across a simulated delay of up to 240 ms — so
+     * a moderation that started before the reset would otherwise resume afterwards and persist
+     * its pre-reset tables over the fresh snapshot. In-memory state would still look reset and
+     * the next reload would restore the dataset the user asked to throw away, which is the worst
+     * shape a bug can have: invisible until the app restarts.
+     *
+     * Dropping the write is the whole fix. The operation was issued against a dataset that no
+     * longer exists, so there is nothing to merge it into and nothing to tell the caller — a
+     * reset is a discard, and this write is part of what was discarded.
+     */
+    if (current !== state) return;
     current.tables = { ...current.tables, ...patch };
     await persist(current);
   };
@@ -510,10 +521,18 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
     },
   };
 
+  /**
+   * Who is in this event's directory: active members, and nobody else.
+   *
+   * `status` is the whole point. `access.ts` already refuses an invitation as membership, and
+   * `directory.listForUser` already filters on `active` — this helper missing the same check is
+   * what let a person keep their entry in the guest list after `memberships.revoke`, which is
+   * the one operation whose entire purpose is to take it away.
+   */
   const memberUserIds = (current: MockState, tenantId: TenantId): ReadonlySet<UserId> =>
     new Set(
       current.tables.memberships
-        .filter((row) => row.tenant_id === tenantId && row.user_id !== null)
+        .filter((row) => row.tenant_id === tenantId && row.status === 'active')
         .flatMap((row) => (row.user_id === null ? [] : [row.user_id])),
     );
 
@@ -569,18 +588,44 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
       memberships: replace(current.tables.memberships, (row) => row.id === next.id, next),
     });
 
+  /**
+   * An invitation's email and phone number are the one piece of personal data in this schema
+   * that belongs to somebody who has not joined yet, and who therefore never agreed to be in
+   * this event's directory. Only an event admin sees them.
+   *
+   * Redacting rather than filtering for the accepted rows: a membership keeps `invited_email`
+   * after it is accepted, so filtering only `invited` rows would still have handed every
+   * member's contact address to any attendee who asked for `statuses: ['active']`.
+   */
+  const withoutInviteContact = (row: MembershipRow): MembershipRow => ({
+    ...row,
+    invited_email: null,
+    invited_phone: null,
+  });
+
   const memberships: DataAdapter['memberships'] = {
     list: async (
       tenantId: TenantId,
       query: MembershipQuery,
       page?: PageRequest,
     ): Promise<Page<Membership>> => {
-      const { current } = await scope(tenantId, 'memberships.list');
+      const { current, membership } = await scope(tenantId, 'memberships.list');
+      /*
+       * Not `requireRole`: a member listing the people at an event is ordinary, and the guest
+       * list is not the secret. The pending invitations are — an invited row is a person who has
+       * not joined, so a non-admin does not see the row at all, and never sees contact details.
+       */
+      const admin = hasRole(membership, ADMIN_ROLES);
       return mapPage(
         paginate({
-          items: inTenant(current.tables.memberships, tenantId).filter(
-            (row) => query.roles.includes(row.role) && query.statuses.includes(row.status),
-          ),
+          items: inTenant(current.tables.memberships, tenantId)
+            .filter(
+              (row) =>
+                query.roles.includes(row.role) &&
+                query.statuses.includes(row.status) &&
+                (admin || row.status !== 'invited'),
+            )
+            .map((row) => (admin ? row : withoutInviteContact(row))),
           sortKey: (row) => timestampKey(row.created_at, 'membership.created_at'),
           id: (row) => row.id,
           order: 'asc',
@@ -604,7 +649,12 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
       const row = current.tables.memberships.find(
         (candidate) => candidate.tenant_id === tenantId && candidate.user_id === userId,
       );
-      return row === undefined ? null : toMembership(row);
+      if (row === undefined) return null;
+      /* Your own membership is yours to read in full; anyone else's contact details are the
+         admin's, by the same rule `memberships.list` applies. */
+      const caller = findActiveMembership(current.tables.memberships, tenantId, me);
+      const admin = caller !== null && hasRole(caller, ADMIN_ROLES);
+      return toMembership(admin || row.user_id === me ? row : withoutInviteContact(row));
     },
 
     invite: async (tenantId: TenantId, invite: MembershipInvite): Promise<Membership> => {

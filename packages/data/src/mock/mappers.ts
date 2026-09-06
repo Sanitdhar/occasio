@@ -315,3 +315,19 @@ const parseTables = (stored: Readonly<Record<string, unknown>>): MockTables | nu
 
 /** The document written back. Kept beside the parser so the two shapes cannot drift apart. */
 export const serialiseSnapshot = (snapshot: MockSnapshot): string => JSON.stringify(snapshot);
+
+/**
+ * A deep copy, by JSON round-trip rather than by `structuredClone`.
+ *
+ * Hermes does not provide `structuredClone` and React Native does not polyfill it, so the call
+ * that works in the web export throws `ReferenceError: Property 'structuredClone' doesn't exist`
+ * on the first iOS or Android run — one tree, three platforms (D2), so "web only for now" is a
+ * deadline, not an exemption.
+ *
+ * The round-trip is exact for everything that reaches this function. Both callers clone rows and
+ * tenant config, which are JSON documents by construction: `rows.ts` mirrors the Postgres shape,
+ * timestamps are ISO strings rather than `Date`s, and there is no `undefined` in a row — a
+ * nullable column is `null`. It lives here because it is a cast, and this is one of the two
+ * files where a cast is legal.
+ */
+export const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;

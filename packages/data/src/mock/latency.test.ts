@@ -7,6 +7,7 @@ import {
   assertLatencyRange,
   createDelay,
   latencyFor,
+  type Sleep,
 } from './latency';
 import { createSeededRandom } from './random';
 
@@ -95,22 +96,82 @@ describe('assertLatencyRange', () => {
 });
 
 describe('createDelay', () => {
-  it('awaits the sleep it computed, rather than resolving straight through', async () => {
+  /**
+   * The sleep is held open rather than resolved immediately, which is the difference between
+   * this test and one that cannot fail: against `Promise.resolve()`, a `createDelay` that called
+   * `sleep(...)` and threw the promise away would pass every assertion below. The delay has to
+   * still be pending while the sleep is.
+   */
+  const heldSleep = (): {
+    readonly sleep: Sleep;
+    readonly slept: readonly number[];
+    readonly release: () => void;
+  } => {
     const slept: number[] = [];
+    const pending: (() => void)[] = [];
+    return {
+      slept,
+      sleep: (ms) => {
+        slept.push(ms);
+        return new Promise<void>((resolve) => {
+          pending.push(resolve);
+        });
+      },
+      release: () => {
+        const resolve = pending.shift();
+        if (resolve === undefined) throw new Error('sleep was never called');
+        resolve();
+      },
+    };
+  };
+
+  /** One turn of the event loop — long enough for a dropped promise to have settled. */
+  const settle = async (): Promise<void> => {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  };
+
+  it('stays pending until the sleep it computed resolves', async () => {
+    const held = heldSleep();
     const delay = createDelay({
       range: DEFAULT_LATENCY,
       random: createSeededRandom(1),
-      sleep: (ms) => {
-        slept.push(ms);
-        return Promise.resolve();
-      },
+      sleep: held.sleep,
     });
 
-    await delay();
-    await delay();
+    let finished = false;
+    const pending = delay().then(() => {
+      finished = true;
+    });
 
-    expect(slept).toHaveLength(2);
-    for (const ms of slept) {
+    await settle();
+    expect(held.slept).toHaveLength(1);
+    /* The assertion the old version of this test could not make. */
+    expect(finished).toBe(false);
+
+    held.release();
+    await pending;
+    expect(finished).toBe(true);
+  });
+
+  it('computes a fresh delay inside the range on every call', async () => {
+    const held = heldSleep();
+    const delay = createDelay({
+      range: DEFAULT_LATENCY,
+      random: createSeededRandom(1),
+      sleep: held.sleep,
+    });
+
+    const first = delay();
+    held.release();
+    await first;
+    const second = delay();
+    held.release();
+    await second;
+
+    expect(held.slept).toHaveLength(2);
+    for (const ms of held.slept) {
       expect(ms).toBeGreaterThanOrEqual(MOCK_LATENCY_MIN_MS);
       expect(ms).toBeLessThanOrEqual(MOCK_LATENCY_MAX_MS);
     }
