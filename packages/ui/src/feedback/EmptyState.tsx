@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
-import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Text, View, type StyleProp } from 'react-native';
+import type { LayoutViewStyle } from '../components/layoutStyle';
 import { createStyles } from '../theme/createStyles';
 
 /**
@@ -16,7 +17,7 @@ import { createStyles } from '../theme/createStyles';
  * depending on the button component to render an empty list.
  */
 
-type Props = {
+export type EmptyStateProps = {
   /**
    * Decorative only — it is hidden from screen readers, because the title and message already
    * carry the meaning and a described picture of nothing is noise. Anything load-bearing
@@ -38,7 +39,11 @@ type Props = {
    * second top-level heading on the page and an outline that reads as two documents.
    */
   readonly headingLevel?: 2 | 3 | 4;
-  readonly style?: StyleProp<ViewStyle> | undefined;
+  /* The narrowing from #120: where the empty state sits, not what it looks like. Typed as the
+     full `ViewStyle` this accepted a caller-supplied background, padding or radius — the D17
+     boundary standing open at one component, and the harder half to see, since a token
+     smuggled through a variable is not a literal for the lint rule to catch. */
+  readonly style?: StyleProp<LayoutViewStyle> | undefined;
 };
 
 const useStyles = createStyles((t) => ({
@@ -63,7 +68,7 @@ export function EmptyState({
   action,
   headingLevel = 2,
   style,
-}: Props) {
+}: EmptyStateProps) {
   const styles = useStyles();
 
   return (

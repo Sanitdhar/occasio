@@ -6,9 +6,15 @@ export { toCssVars } from './theme/cssVars';
 export { toElevationStyle } from './theme/elevation';
 export { createStyleCache, DEFAULT_MAX_THEMES, type StyleCache } from './theme/styleCache';
 
-export { EmptyState } from './feedback/EmptyState';
+export { EmptyState, type EmptyStateProps } from './feedback/EmptyState';
 export { Skeleton, SkeletonText } from './feedback/Skeleton';
-export { SkeletonGroup, SkeletonPulseContext, useSkeletonPulse } from './feedback/SkeletonGroup';
+/*
+ * `SkeletonPulseContext` is deliberately not exported. Wrapping bare `<Skeleton>` components in
+ * a provider of one's own silences `useSkeletonPulse`'s outside-group error while the group's
+ * `role="progressbar"`, `aria-label` and `aria-busy` never render — an escape hatch that
+ * removes the accessibility semantics and the error that would have reported their absence.
+ */
+export { SkeletonGroup, useSkeletonPulse } from './feedback/SkeletonGroup';
 export {
   DEFAULT_LAST_LINE_WIDTH,
   skeletonTextRows,

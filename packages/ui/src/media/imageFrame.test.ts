@@ -15,13 +15,18 @@ describe('imageAccessibility', () => {
     warn.mockRestore();
   });
 
+  it('carries no hiding flag at all on an image it describes', () => {
+    /* Omitted rather than `false`. `aria-hidden="false"` is a real value with real meaning on
+       web, and spreading it onto every described image is a prop that has to be read to be
+       ignored — the deprecated pair it replaced had exactly that shape. */
+    expect(imageAccessibility('The cake', false)['aria-hidden']).toBeUndefined();
+  });
+
   it('announces an image that has alternative text', () => {
     expect(imageAccessibility('The couple cutting the cake', false)).toEqual({
       accessible: true,
-      accessibilityRole: 'image',
-      accessibilityLabel: 'The couple cutting the cake',
-      accessibilityElementsHidden: false,
-      importantForAccessibility: 'yes',
+      role: 'img',
+      'aria-label': 'The couple cutting the cake',
     });
     expect(warn).not.toHaveBeenCalled();
   });
@@ -29,14 +34,14 @@ describe('imageAccessibility', () => {
   it('hides a decorative image rather than announcing an empty one', () => {
     const props = imageAccessibility(undefined, true);
 
-    /* Empty rather than absent: expo-image maps accessibilityLabel to the web `alt` attribute,
-       and `alt=""` is what removes an image from the accessibility tree. A missing attribute
-       makes a screen reader read the file name instead. */
-    expect(props.accessibilityLabel).toBe('');
+    /* Empty rather than absent: an empty label is what removes an image from the accessibility
+       tree, where a missing one makes a screen reader read the file name instead. */
+    expect(props['aria-label']).toBe('');
     expect(props.accessible).toBe(false);
-    expect(props.accessibilityElementsHidden).toBe(true);
-    expect(props.importantForAccessibility).toBe('no-hide-descendants');
-    expect(props.accessibilityRole).toBeUndefined();
+    /* One flag now covers both platforms — React Native maps `aria-hidden` onto
+       `accessibilityElementsHidden` for iOS and `importantForAccessibility` for Android. */
+    expect(props['aria-hidden']).toBe(true);
+    expect(props.role).toBeUndefined();
 
     /* Declaring an image decorative is a decision, not a mistake, so it is the one hiding path
        that must stay quiet. A warning here would train people to ignore the others. */
@@ -61,7 +66,7 @@ describe('imageAccessibility', () => {
     const props = imageAccessibility(undefined, false);
 
     expect(props.accessible).toBe(false);
-    expect(props.accessibilityElementsHidden).toBe(true);
+    expect(props['aria-hidden']).toBe(true);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]?.[0]).toContain('neither');
   });
@@ -71,7 +76,7 @@ describe('imageAccessibility', () => {
        `decorative` would drop a description someone actually wrote. */
     const props = imageAccessibility('The ceremony arch', true);
 
-    expect(props.accessibilityLabel).toBe('The ceremony arch');
+    expect(props['aria-label']).toBe('The ceremony arch');
     expect(props.accessible).toBe(true);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]?.[0]).toContain('both');
@@ -81,8 +86,10 @@ describe('imageAccessibility', () => {
 describe('hasOverlay', () => {
   it('counts anything React will actually paint', () => {
     expect(hasOverlay('A caption')).toBe(true);
+    /* React paints `0`, so a caption of zero is a caption. */
     expect(hasOverlay(0)).toBe(true);
-    expect(hasOverlay([])).toBe(true);
+    expect(hasOverlay(['A caption'])).toBe(true);
+    expect(hasOverlay([null, 'A caption'])).toBe(true);
   });
 
   it('does not count the values a JSX conditional collapses to', () => {
@@ -94,6 +101,26 @@ describe('hasOverlay', () => {
     expect(hasOverlay(null)).toBe(false);
     expect(hasOverlay(false)).toBe(false);
     expect(hasOverlay(true)).toBe(false);
+  });
+
+  it('does not count an empty string or an empty list', () => {
+    /*
+     * `{caption}` where the caption is `''`, and `{items.map(…)}` where the list is empty. Both
+     * paint nothing and both used to count as content, so a photograph with no text on it got a
+     * scrim and an absolutely-positioned padded overlay laid over it.
+     *
+     * `''` was the reported case; `[]` is the same bug in the value one line above it, and the
+     * old suite asserted it was content.
+     */
+    expect(hasOverlay('')).toBe(false);
+    expect(hasOverlay([])).toBe(false);
+  });
+
+  it('does not count a list whose every entry collapses', () => {
+    /* What a list of conditionals leaves behind: `{[cond1 && <A/>, cond2 && <B/>]}` with both
+       false. Checking only the array itself would call this content. */
+    expect(hasOverlay([null, false, undefined])).toBe(false);
+    expect(hasOverlay([[], ['']])).toBe(false);
   });
 });
 
