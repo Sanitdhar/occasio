@@ -70,8 +70,21 @@ describe('every key', () => {
     expect(queryKeys.venues.list(WEDDING, { limit: 10 })).not.toEqual(
       queryKeys.venues.list(WEDDING, { limit: 20 }),
     );
-    /* And an unpaged request is its own key rather than colliding with a paged one. */
-    expect(queryKeys.venues.list(WEDDING)).not.toEqual(queryKeys.venues.list(WEDDING, {}));
+  });
+
+  it('treats an omitted page and an empty one as the same request', () => {
+    /* `list(t)` and `list(t, {})` ask for exactly the same thing — the first page with the
+       repository's defaults — so two cache entries for it means two fetches, which reads as the
+       app being slow rather than as a key bug. The previous version of this test asserted they
+       differ, which enshrined the defect as the contract. */
+    expect(queryKeys.venues.list(WEDDING)).toEqual(queryKeys.venues.list(WEDDING, {}));
+    expect(queryKeys.venues.list(WEDDING, { limit: undefined })).toEqual(
+      queryKeys.venues.list(WEDDING),
+    );
+    /* But a real page request is still its own key. */
+    expect(queryKeys.venues.list(WEDDING, { limit: 10 })).not.toEqual(
+      queryKeys.venues.list(WEDDING),
+    );
   });
 });
 
@@ -105,6 +118,19 @@ describe('invalidation prefixes', () => {
     expect(
       isPrefixOf(queryKeys.sessions.all(WEDDING), queryKeys.sessions.list(FESTIVAL, PUBLISHED)),
     ).toBe(false);
+  });
+
+  it('leaves the directory unscoped, because it is how a tenant is found', () => {
+    /*
+     * The one documented exception, and it mirrors the repository layer: `TenantDirectory` is
+     * the single cross-tenant surface — `bySlug` resolves `/e/[slug]` for someone who has no
+     * tenant yet, and `forUser` answers "which events am I in". Prefixing either with a tenant
+     * would mean inventing one to look up the thing that produces it.
+     */
+    expect(queryKeys.directory.bySlug('sanit-riyanks')[0]).not.toBe('tenant');
+    expect(queryKeys.directory.forUser(userId('u_1'))[0]).not.toBe('tenant');
+    /* And they are still distinct from one another, and from a different subject. */
+    expect(queryKeys.directory.bySlug('a')).not.toEqual(queryKeys.directory.bySlug('b'));
   });
 
   it('lets the tenant prefix clear the whole event', () => {

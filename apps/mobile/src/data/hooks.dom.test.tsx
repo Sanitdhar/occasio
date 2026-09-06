@@ -20,6 +20,9 @@ import { useCreateGossip, useGossip } from './hooks';
 const WEDDING = tenantId('t_sanit-riyanks');
 const PENDING = { statuses: ['pending'] } as const;
 
+/** Every client built by `wrapper`, so `afterEach` can clear them. */
+const clients: QueryClient[] = [];
+
 const wrapper = () => {
   const adapter = createMockAdapter({
     currentUserId: userId('u_meera'),
@@ -27,10 +30,19 @@ const wrapper = () => {
     storage: createMemoryStorage(),
     latency: { minMs: 0, maxMs: 0 },
   });
-  /* Retries off: a failing query would otherwise retry twice before the assertion sees it, and
-     the test would report a timeout rather than the error. */
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  /*
+   * Retries off: a failing query would otherwise retry twice before the assertion sees it, and
+   * the test would report a timeout rather than the error.
+   *
+   * `gcTime: Infinity` because releasing an inactive query schedules a garbage-collection timer,
+   * and a timer outliving the test keeps a handle open — Jest then waits on it and reports a
+   * slow or hanging run rather than the finished one it had.
+   */
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
 
+  clients.push(client);
   return {
     client,
     Wrapper: ({ children }: { readonly children: ReactNode }) => (
@@ -43,8 +55,9 @@ const wrapper = () => {
 
 describe('useGossip', () => {
   afterEach(() => {
-    /* Caches are per-test by construction above, but a lingering timer from a settled query
-       still keeps a handle open. */
+    /* Clearing drops the cached entries now rather than leaving them for a collection timer
+       that outlives the test. */
+    for (const client of clients.splice(0)) client.clear();
   });
 
   it('reads through the adapter it was given', async () => {
