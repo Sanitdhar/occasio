@@ -18,6 +18,7 @@
 import { readFileSync } from 'node:fs';
 import { isReviewable, parseExcludedPaths } from './reviewablePaths.mjs';
 import { COMPARE_FILE_CAP, coversAllOf, diffEntries, isDescribable } from './diffFingerprint.mjs';
+import { isFullReviewFinished } from './reviewMarkers.mjs';
 
 /**
  * Exact logins, not a substring match.
@@ -142,6 +143,26 @@ const reviewEvidence = [
   ...issueComments
     .filter((c) => byReviewer(c) && c.body.includes('Walkthrough'))
     .map((c) => c.created_at),
+  /*
+   * A full review that found nothing.
+   *
+   * Every other entry here is something a review produced, and a clean review produces none of
+   * them: no walkthrough, no finding, no submitted review — just a note edited into the
+   * acknowledgement saying it finished. #144 sat on that for hours, reviewed and clean and
+   * permanently stale, because the gate had nothing newer than the head to point at.
+   *
+   * Dated by `created_at`, which is when the command was acknowledged and therefore when the
+   * review was scoped, not `updated_at`, which is when it finished. The two differ by minutes,
+   * and a commit pushed inside that window is one the review did not read — with `created_at`
+   * the head is then newer than the evidence and this still refuses, which is the answer that
+   * costs a wait rather than a merge.
+   *
+   * Evidence only: it dates a review, it cannot be one. `reviewed` below is deliberately left
+   * alone, so this can refresh an existing review and never manufacture a first one.
+   */
+  ...issueComments
+    .filter((c) => byReviewer(c) && isFullReviewFinished(c.body))
+    .map((c) => c.created_at),
   ...(rateLimited
     ? [
         ...reviewComments.filter(byClaude).map((c) => c.created_at),
@@ -150,6 +171,13 @@ const reviewEvidence = [
     : []),
 ].filter((value) => value != null);
 const lastReviewAt = reviewEvidence.length === 0 ? null : reviewEvidence.sort().at(-1);
+
+/** Reported separately, because "clean full review" and "no review" look identical otherwise. */
+const fullReviewAt = issueComments
+  .filter((c) => byReviewer(c) && isFullReviewFinished(c.body))
+  .map((c) => c.created_at)
+  .sort()
+  .at(-1);
 
 /** Read once. Absent in a checkout that does not have it, which simply excludes nothing. */
 const excludedPaths = (() => {
@@ -271,6 +299,7 @@ console.log(`  reviews     : ${String(submitted)}`);
 console.log(`  rate limited: ${String(rateLimited)}`);
 console.log(`  claude      : ${String(claudeReviewed)} (findings: ${String(claudeFindings)})`);
 console.log(`  last review : ${lastReviewAt ?? 'none'}`);
+if (fullReviewAt !== undefined) console.log(`  full review : ${fullReviewAt}`);
 console.log(`  head commit : ${prData.head.sha.slice(0, 7)} ${headAt ?? 'unknown'}`);
 if (rebasedOnly) {
   console.log(
