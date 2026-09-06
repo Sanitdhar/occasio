@@ -16,6 +16,16 @@ export type RecentTenant = {
 
 export const RECENT_KEY = 'occasio.recentTenants';
 
+/**
+ * Where the previous version kept a single slug.
+ *
+ * Read only when `RECENT_KEY` is absent, and migrated on the spot. Without this an installation
+ * that upgrades mid-event silently forgets where it was — and on native, where the recent list
+ * is most of the answer to "where was I", that means a returning attendee lands on a join screen
+ * holding a code they were given once, weeks ago.
+ */
+export const LEGACY_KEY = 'occasio.recentTenant';
+
 /** Enough to recognise an event you were at; short enough to stay a list rather than a history. */
 export const RECENT_LIMIT = 8;
 
@@ -78,6 +88,25 @@ export const parseRecentTenants = (raw: string | null): RecentTenant[] => {
   }
 
   return out;
+};
+
+/**
+ * One storage update at a time.
+ *
+ * `rememberTenant` is read-modify-write across two awaits, so two of them in flight — a deep
+ * link resolving while the gate loads another event, a fast tab switch — can both read the same
+ * list and the later write silently discards the other's entry. The list is small and the fix is
+ * a queue rather than a lock: each task starts only when the last one has settled.
+ *
+ * A failing task must not poison the queue, so the stored chain swallows rejections while the
+ * caller still sees its own.
+ */
+let chain: Promise<unknown> = Promise.resolve();
+
+export const serialise = <T>(task: () => Promise<T>): Promise<T> => {
+  const next = chain.then(task, task);
+  chain = next.catch(() => undefined);
+  return next;
 };
 
 /**
