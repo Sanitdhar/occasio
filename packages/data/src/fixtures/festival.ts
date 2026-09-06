@@ -137,11 +137,23 @@ const personas = [owl, fern];
 export const FESTIVAL: Partial<MockTables> = {
   tenants: [FESTIVAL_TENANT],
   tenantConfigs: [FESTIVAL_CONFIG],
+  /* `meera` is declared by the wedding fixture; a user exists once and belongs to many. */
   users: [user('devi', 'Devi Menon'), user('rafi', 'Rafi Ahmed'), user('lena', 'Lena Fischer')],
   memberships: [
     membership(T, 'fes_devi', ids.user('devi'), 'event_admin'),
     membership(T, 'fes_rafi', ids.user('rafi'), 'crew'),
     membership(T, 'fes_lena', ids.user('lena'), 'attendee'),
+    /*
+     * Someone involved in two events, which every other fixture user is not — and their absence
+     * quietly made "scoped by tenant" untestable: a query or a listener that ignored the scope
+     * would still see nothing, because there was nothing of another event's to reach. She
+     * moderates the wedding in the fixture next door and helps here.
+     *
+     * A moderator rather than an attendee on purpose. An attendee only ever sees `approved`
+     * posts (D3), so a test written on one would pass on the moderation filter whether or not
+     * the tenant filter existed.
+     */
+    membership(T, 'fes_meera', ids.user('meera'), 'moderator'),
   ],
   venues: stages,
   sessions,
