@@ -1,4 +1,3 @@
-import type { ApprovalRequestId } from '../rows';
 import {
   MOCK_SNAPSHOT_VERSION,
   type MockSnapshot,
@@ -16,20 +15,13 @@ import {
  *  1. `parseSnapshot` turns the JSON string a browser handed back into `MockTables`. `JSON.parse`
  *     returns `any`; without a checked door into the type system, every read after it is an
  *     unsafe access the linter is right to reject.
- *  2. `approvalRequestId` brands a string as an `ApprovalRequestId`. That id is declared in
- *     `rows.ts` rather than `@occasio/core` (see the note there), so unlike the other thirteen it
- *     has no constructor in `ids.ts` to borrow. When it moves into core, this goes with it.
+ *  2. `cloneJson` copies a document by round-tripping it through JSON, which means typing the
+ *     result of `JSON.parse` — the same door, for the same reason.
  *
  * The root `mappers.ts` explains why this exemption exists at all: it is the seam where database
  * output becomes checked data, and the eslint config grants it to `packages/data/src/**\/mappers.ts`
  * precisely so each adapter has one.
  */
-
-/**
- * Brands a string as an `ApprovalRequestId`. Mirrors the constructors in `@occasio/core/ids` and
- * moves there with the type.
- */
-export const approvalRequestId = (value: string): ApprovalRequestId => value as ApprovalRequestId;
 
 /* ---------------------------------------------------------------------------------------------
  * Snapshot parsing

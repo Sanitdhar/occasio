@@ -38,7 +38,7 @@ export {
   type Sleep,
 } from './latency';
 
-export { approvalRequestId, parseSnapshot, serialiseSnapshot } from './mappers';
+export { parseSnapshot, serialiseSnapshot } from './mappers';
 
 export {
   decodeCursor,
