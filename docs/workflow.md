@@ -101,10 +101,17 @@ and exits non-zero if there is none.
 
 ### Parallel work is capped by the review budget, not by machines
 
-The budget is roughly **10 reviews per hour for the organisation**, and every push to an open PR
-consumes another one. Four or five PRs in flight is the practical ceiling; beyond that reviews
-start silently degrading to rate-limit passes rather than queueing. Throughput here is limited
-by review, not by how much can be written at once.
+CodeRabbit's capacity is a rolling, plan-dependent quota — not a number worth hardcoding here,
+and the message it posts when exhausted ("you've used all N included reviews currently
+available") reflects the plan at that moment. Check the
+[review capacity dashboard](https://app.coderabbit.ai/dashboard/review-capacity) for the current
+figure.
+
+What matters is the shape rather than the number: **every push to every open PR spends from the
+same pool**, and when it runs dry reviews degrade into rate-limit passes rather than queueing.
+Running many PRs at once therefore does not raise throughput past that point — it converts
+reviews into unreviewed merges. Throughput here is limited by review capacity, not by how much
+can be written at once.
 
 **Verify before you accept.** A reviewer can be right for the wrong reason, or wrong in a way
 that looks right. On #95 the Metro finding was correct, but checking it showed the real problem
