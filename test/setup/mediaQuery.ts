@@ -32,6 +32,22 @@ const registrations: Registration[] = [];
 
 const REDUCED_MOTION = 'prefers-reduced-motion';
 
+/**
+ * What a given query evaluates to, given the current preference.
+ *
+ * `(prefers-reduced-motion: reduce)` and `(prefers-reduced-motion: no-preference)` are the two
+ * halves of one setting and always disagree. Answering the same value for both would let a test
+ * observe them agreeing, which no browser does — and it is the sort of wrongness that only
+ * shows up once somebody writes the `no-preference` query, by which time the stub has been
+ * trusted for months.
+ *
+ * Anything else is not about motion, so it is false regardless and receives no events.
+ */
+const matchesQuery = (query: string, reduced: boolean): boolean => {
+  if (!query.includes(REDUCED_MOTION)) return false;
+  return query.includes('no-preference') ? !reduced : reduced;
+};
+
 const add = (query: string, listener: MediaListener): void => {
   registrations.push({ query, listener });
 };
@@ -53,7 +69,7 @@ export const installMatchMedia = (): void => {
       get matches() {
         /* Live rather than captured: react-native-web reads `.matches` on every call, and a
            frozen value would make `setReducedMotion` silently do nothing. */
-        return query.includes(REDUCED_MOTION) && state.reduced;
+        return matchesQuery(query, state.reduced);
       },
       onchange: null,
       addEventListener: (_event: string, fn: MediaListener) => {
@@ -82,7 +98,11 @@ export const setReducedMotion = (reduced: boolean): void => {
   if (state.reduced === reduced) return;
   state.reduced = reduced;
   for (const entry of [...registrations]) {
-    if (entry.query.includes(REDUCED_MOTION)) entry.listener({ matches: reduced });
+    /* Each listener is told what *its own* query now evaluates to, which is what a browser
+       delivers — not the raw preference. The two halves receive opposite events. */
+    if (entry.query.includes(REDUCED_MOTION)) {
+      entry.listener({ matches: matchesQuery(entry.query, reduced) });
+    }
   }
 };
 
