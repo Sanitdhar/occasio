@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import { AccessibilityInfo } from 'react-native';
 import { useReducedMotion } from './useReducedMotion';
 
 /**
@@ -70,5 +71,50 @@ describe('useReducedMotion', () => {
 
     expect(() => render(<Probe />)).not.toThrow();
     expect(screen.getByTestId('reduced').textContent).toBe('false');
+  });
+
+  it('does not let the initial read undo a change that arrived first', async () => {
+    /*
+     * The two values travel on different channels — on native the initial read comes back
+     * through a bridge callback while changes arrive over the event emitter — so nothing orders
+     * them. Toggling the setting during the first render would otherwise be undone a moment
+     * later by a promise carrying the value from before the toggle: the preference reverting on
+     * its own, which nobody reports because nobody believes it.
+     */
+    stubMatchMedia(false);
+
+    let resolveInitial: (value: boolean) => void = () => undefined;
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        resolveInitial = resolve;
+      }),
+    );
+
+    let emitChange: (enabled: boolean) => void = () => undefined;
+    jest.spyOn(AccessibilityInfo, 'addEventListener').mockImplementation((_event, handler) => {
+      emitChange = handler as (enabled: boolean) => void;
+      return { remove: () => undefined };
+    });
+
+    render(<Probe />);
+    expect(screen.getByTestId('reduced').textContent).toBe('false');
+
+    /* The person turns it on while the initial read is still in flight. */
+    act(() => {
+      emitChange(true);
+    });
+    expect(screen.getByTestId('reduced').textContent).toBe('true');
+
+    /* …and the stale read lands afterwards, carrying the value from before the toggle.
+
+       Awaited, and the callback is async: resolving a promise queues a microtask, and a
+       synchronous `act` returns before it runs — which made the first version of this test pass
+       against the bug it was written for. */
+    await act(async () => {
+      resolveInitial(false);
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('reduced').textContent).toBe('true');
   });
 });

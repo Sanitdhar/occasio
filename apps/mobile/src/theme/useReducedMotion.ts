@@ -41,16 +41,29 @@ export const useReducedMotion = (): boolean => {
 
   useEffect(() => {
     let active = true;
+    let changedSinceMount = false;
+
+    const onChange = (enabled: boolean): void => {
+      changedSinceMount = true;
+      setReduced(enabled);
+    };
+
+    /*
+     * The listener is registered before the read, and the read defers to it.
+     *
+     * They are separate channels — on native the initial value arrives through a bridge
+     * callback while changes come over the event emitter — so their order is not guaranteed.
+     * Toggling the setting during the first render would otherwise be undone a moment later by
+     * a promise carrying the value from before the toggle: the preference visibly reverting on
+     * its own, which is the kind of thing nobody reports because nobody believes it.
+     */
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', onChange);
 
     /* Native has no synchronous read, so the real value arrives here. On web this confirms what
        the initialiser already found. */
     void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (active) setReduced(enabled);
+      if (active && !changedSinceMount) setReduced(enabled);
     });
-
-    /* The setting can change while the app is open — iOS and Android both let it be toggled
-       from a control centre, and a browser follows the OS. */
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
 
     return () => {
       active = false;
