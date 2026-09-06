@@ -16,7 +16,7 @@
  *   requests also work, at a lower rate limit.
  */
 import { readFileSync } from 'node:fs';
-import { COMPARE_FILE_CAP, diffFingerprint, isDescribable } from './diffFingerprint.mjs';
+import { COMPARE_FILE_CAP, coversAllOf, diffEntries, isDescribable } from './diffFingerprint.mjs';
 
 /**
  * Exact logins, not a substring match.
@@ -179,7 +179,7 @@ const effectiveDiff = async (sha) => {
     /* A file with neither a patch nor a blob sha is a file this cannot describe. Both would
        serialise as `binary:unknown`, which is one unknown matching another. */
     if (!files.every(isDescribable)) return null;
-    return diffFingerprint(files);
+    return diffEntries(files);
   } catch {
     /* A force-pushed commit can fall out of reach. Unknown is not "unchanged". */
     return null;
@@ -204,13 +204,27 @@ const reviewedSha = [...reviews]
   .sort((a, b) => (a.submitted_at < b.submitted_at ? -1 : 1))
   .at(-1)?.commit_id;
 
+/**
+ * Whether everything the head proposes was part of what the review read.
+ *
+ * A subset rather than an equality, and the difference is not a convenience. A pull request
+ * whose base absorbed one of its files — `main` merged the same lockfile fix, say — proposes a
+ * strictly smaller change than the one that was reviewed, and dropping a file cannot introduce
+ * code nobody read. Equality refuses that, and CodeRabbit will not clear it either: asked to
+ * look again it answers "No files to review", because there is nothing new to read. The gate
+ * then wants a review that cannot be produced, which is a stuck pull request rather than a safe
+ * one.
+ *
+ * Any file whose patch differs is simply not in the reviewed set, so an edit still fails here.
+ */
 const sameDiffAsReviewed = async () => {
   if (reviewedSha === undefined || reviewedSha === prData.head.sha) return false;
   const [reviewedDiff, headDiff] = await Promise.all([
     effectiveDiff(reviewedSha),
     effectiveDiff(prData.head.sha),
   ]);
-  return reviewedDiff !== null && headDiff !== null && reviewedDiff === headDiff;
+  if (reviewedDiff === null || headDiff === null) return false;
+  return coversAllOf(reviewedDiff, headDiff);
 };
 /*
  * Fails closed. An absent timestamp is a reason to look rather than to pass, and treating one
@@ -237,7 +251,7 @@ console.log(`  last review : ${lastReviewAt ?? 'none'}`);
 console.log(`  head commit : ${prData.head.sha.slice(0, 7)} ${headAt ?? 'unknown'}`);
 if (rebasedOnly) {
   console.log(
-    `  rebase only : yes — same effective diff as the reviewed commit ${String(reviewedSha).slice(0, 7)}`,
+    `  rebase only : yes — every change is one the review of ${String(reviewedSha).slice(0, 7)} already read`,
   );
 }
 

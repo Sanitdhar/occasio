@@ -19,4 +19,6 @@ export type ComparedFile = {
 
 export declare const COMPARE_FILE_CAP: number;
 export declare const isDescribable: (file: ComparedFile) => boolean;
+export declare const diffEntries: (files: readonly ComparedFile[]) => string[];
+export declare const coversAllOf: (reviewed: readonly string[], head: readonly string[]) => boolean;
 export declare const diffFingerprint: (files: readonly ComparedFile[]) => string;

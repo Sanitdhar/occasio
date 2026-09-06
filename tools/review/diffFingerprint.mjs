@@ -35,10 +35,16 @@ export const COMPARE_FILE_CAP = 300;
 export const isDescribable = (file) => (file.patch ?? file.sha ?? null) !== null;
 
 /**
+ * One string per file, each identifying that file's change completely.
+ *
+ * Separate from the joined fingerprint because a comparison is sometimes a *subset* of another
+ * rather than equal to it — a pull request whose base absorbed one of its files still proposes
+ * only changes that were already read — and a single joined string cannot express that.
+ *
  * @param {{ filename?: string, previous_filename?: string, patch?: string, sha?: string, status?: string }[]} files
- * @returns {string}
+ * @returns {string[]}
  */
-export const diffFingerprint = (files) =>
+export const diffEntries = (files) =>
   files
     .map((file) => {
       const name = file.filename ?? '';
@@ -60,5 +66,31 @@ export const diffFingerprint = (files) =>
     })
     /* Sorted, because the API does not promise a stable file order between calls, and a
        fingerprint that depends on response ordering would report spurious differences. */
-    .sort()
-    .join('\n--\n');
+    .sort();
+
+/**
+ * @param {{ filename?: string, previous_filename?: string, patch?: string, sha?: string, status?: string }[]} files
+ * @returns {string}
+ */
+export const diffFingerprint = (files) => diffEntries(files).join('\n--\n');
+
+/**
+ * Whether every change in `head` appears in `reviewed`.
+ *
+ * The question the freshness check actually asks. Equality is too strict: a pull request whose
+ * base absorbed one of its files proposes strictly less than what was read, and dropping a file
+ * cannot introduce code nobody saw. A file whose patch changed is simply not in the reviewed
+ * set, so an edit still answers false.
+ *
+ * An empty `head` answers true, which is correct — a pull request that now proposes nothing has
+ * nothing unreviewed in it — and is why the caller checks that the comparison was complete
+ * before asking.
+ *
+ * @param {readonly string[]} reviewed
+ * @param {readonly string[]} head
+ * @returns {boolean}
+ */
+export const coversAllOf = (reviewed, head) => {
+  const seen = new Set(reviewed);
+  return head.every((entry) => seen.has(entry));
+};

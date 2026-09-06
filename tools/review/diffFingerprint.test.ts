@@ -1,6 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   COMPARE_FILE_CAP,
+  coversAllOf,
+  diffEntries,
   diffFingerprint,
   isDescribable,
   type ComparedFile,
@@ -129,5 +131,53 @@ describe('isDescribable', () => {
   it('accepts an empty patch, which is a real value', () => {
     /* A pure rename has an empty patch rather than no patch, and it is describable. */
     expect(isDescribable({ patch: '' })).toBe(true);
+  });
+});
+
+describe('coversAllOf', () => {
+  const a = 'a.ts\nnone\nmodified\n@@ -1 +1 @@';
+  const b = 'b.ts\nnone\nmodified\n@@ -2 +2 @@';
+  const bEdited = 'b.ts\nnone\nmodified\n@@ -2 +2 @@ different';
+
+  it('accepts an identical comparison', () => {
+    expect(coversAllOf([a, b], [a, b])).toBe(true);
+  });
+
+  it('accepts a head that dropped a file the review had read', () => {
+    /* The case this exists for: `main` absorbed one of the PR's files, so the PR now proposes
+       strictly less than what was reviewed. Dropping a file cannot introduce unread code, and
+       CodeRabbit will not re-review it — asked again, it answers "No files to review". */
+    expect(coversAllOf([a, b], [a])).toBe(true);
+  });
+
+  it('rejects a head that changed a file', () => {
+    /* The edit that must never ride in on an older review. */
+    expect(coversAllOf([a, b], [a, bEdited])).toBe(false);
+  });
+
+  it('rejects a head that added a file', () => {
+    expect(coversAllOf([a], [a, b])).toBe(false);
+  });
+
+  it('accepts an empty head, which proposes nothing', () => {
+    expect(coversAllOf([a, b], [])).toBe(true);
+  });
+
+  it('rejects everything when nothing was reviewed', () => {
+    expect(coversAllOf([], [a])).toBe(false);
+  });
+
+  it('works on the entries the fingerprint is built from', () => {
+    /* The two halves have to agree: `diffEntries` produces what `coversAllOf` compares, and a
+       change to either alone would silently stop the freshness check from meaning anything. */
+    const files: ComparedFile[] = [
+      { filename: 'a.ts', status: 'modified', patch: '@@ -1 +1 @@' },
+      { filename: 'b.ts', status: 'modified', patch: '@@ -2 +2 @@' },
+    ];
+    const entries = diffEntries(files);
+
+    expect(entries).toHaveLength(2);
+    expect(coversAllOf(entries, diffEntries(files.slice(0, 1)))).toBe(true);
+    expect(diffFingerprint(files)).toBe(entries.join('\n--\n'));
   });
 });
