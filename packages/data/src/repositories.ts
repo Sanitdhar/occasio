@@ -116,17 +116,37 @@ export type Change<TItem, TId extends string> =
  * How a caller obtains a `TenantId` in the first place — and therefore the only type in this
  * file whose methods do not start with one.
  *
- * It is a separate type rather than two more methods on `TenantRepository` so that the exception
- * is countable at a glance. Both methods are the moment tenancy is established: `bySlug`
- * resolves `/e/[slug]` (D9), and `listForUser` answers "which events am I in", which is
- * cross-tenant by definition. Everything reachable from either takes the id explicitly.
+ * It is a separate type rather than more methods on `TenantRepository` so that the exception is
+ * countable at a glance. Each method here is a moment tenancy is established: `bySlug` resolves
+ * `/e/[slug]` (D9), `byJoinCode` resolves a code printed on a card, and `listForUser` answers
+ * "which events am I in", which is cross-tenant by definition. Everything reachable from any of
+ * them takes the id explicitly.
  *
  * This mirrors `rows.ts`, where the same three tables that carry no `tenant_id` are the ones
  * tenancy is defined in terms of.
+ *
+ * **`byJoinCode` is the third, and it was added on purpose.** The contract suite pinned this
+ * type at exactly two methods so that a third would have to be a decision somebody makes in
+ * writing rather than one that happens — this is that decision, and the reasoning is: native has
+ * no URL bar (ADR-0003), so at a real event the only way in is a printed code, and a code cannot
+ * be resolved by anything that already needs a tenant. The alternative was to treat the slug as
+ * the code, which fails the moment a slug is `lila-and-sam` and the card says `SANRIY26`.
  */
 export type TenantDirectory = {
   /** Throws `NotFoundError` for an unknown slug, including one that exists but is private. */
   readonly bySlug: (slug: string) => Promise<Tenant>;
+  /**
+   * The event a printed code belongs to.
+   *
+   * Throws `NotFoundError` for a code nobody holds — and, unlike `bySlug`, that includes a
+   * private event, whose code is exactly the credential that lets somebody in. Comparison is
+   * normalised on both sides (see joinCode.ts): a code is transcribed by a person from a card,
+   * so case, spaces and hyphens are theirs to get wrong.
+   *
+   * An event with no code (`join_code` is `null`) can never be reached here. Matching on `null`
+   * would make every codeless event joinable by submitting nothing.
+   */
+  readonly byJoinCode: (code: string) => Promise<Tenant>;
   readonly listForUser: (userId: UserId, page?: PageRequest) => Promise<Page<Tenant>>;
 };
 

@@ -37,6 +37,7 @@ import type {
   Venue,
 } from '../domain';
 import { NotFoundError, ValidationError, type ValidationIssue } from '../errors';
+import { joinCodeMatches } from '../joinCode';
 import {
   toAnnouncement,
   toApprovalRequest,
@@ -451,6 +452,27 @@ export const createMockAdapter = (options: MockAdapterOptions): MockAdapter => {
           findActiveMembership(current.tables.memberships, tenant.id, me) === null)
       ) {
         throw new NotFoundError({ entity: 'tenant', id: slug });
+      }
+      return toTenant(tenant);
+    },
+
+    byJoinCode: async (code: string): Promise<Tenant> => {
+      const current = await load();
+      await delay();
+      /*
+       * No visibility check, and that is the difference from `bySlug`. A private event is
+       * invisible to somebody who guesses its slug; its join code is the thing that makes them
+       * not a stranger. Refusing here would make a printed code useless at exactly the events
+       * that rely on one.
+       *
+       * `joinCodeMatches` refuses a stored `null`, so an event without a code cannot be reached
+       * by submitting an empty field.
+       */
+      const tenant = current.tables.tenants.find((row) => joinCodeMatches(row.join_code, code));
+      if (tenant === undefined) {
+        /* The code is echoed back as the id, which is what the caller asked for — and it is not
+           a secret to the person who just typed it. */
+        throw new NotFoundError({ entity: 'tenant', id: code });
       }
       return toTenant(tenant);
     },
