@@ -56,11 +56,15 @@ describe('diffFingerprint', () => {
      * line is the fail-open direction: two different patches fingerprint the same, and the gate
      * reports a review that never happened.
      */
-    const increments = file({ patch: '@@ -1,2 +1,3 @@\n const a = 1;\n+++counter;' });
-    const decrements = file({ patch: '@@ -1,2 +1,3 @@\n const a = 1;\n+--counter;' });
+    const added = file({ patch: '@@ -1,2 +1,3 @@\n const a = 1;\n+++counter;' });
+    const removed = file({ patch: '@@ -1,3 +1,2 @@\n const a = 1;\n---counter;' });
 
-    expect(diffFingerprint([increments])).not.toBe(diffFingerprint([decrements]));
-    expect(diffFingerprint([increments])).toContain('++counter;');
+    /* Each encoding checked on its own, because comparing the two to each other passes for a
+       regression that drops one of them -- which is what the first version of this test did:
+       both its fixtures were *added* lines, so nothing exercised `---`. */
+    expect(diffFingerprint([added])).toContain('++counter;');
+    expect(diffFingerprint([removed])).toContain('--counter;');
+    expect(diffFingerprint([added])).not.toBe(diffFingerprint([removed]));
   });
 
   it('still drops the filename headers themselves', () => {
