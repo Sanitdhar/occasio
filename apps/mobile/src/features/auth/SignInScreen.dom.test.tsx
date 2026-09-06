@@ -32,6 +32,24 @@ describe('SignInScreen', () => {
     expect(screen.getByTestId('sign-in-google')).toBeTruthy();
   });
 
+  it('admits when it is not really Google', () => {
+    /*
+     * A button reading "Continue with Google" that signs somebody in as a fixed account, with
+     * nothing on screen saying so, is the app lying about what it just did — and the person most
+     * likely to be misled is whoever is demonstrating it to somebody else. It goes away with the
+     * mock, which is one file.
+     */
+    renderSignIn({ demo: true });
+
+    expect(screen.getByTestId('sign-in-demo').textContent).toMatch(/not connected yet/);
+  });
+
+  it('says nothing of the sort once a real provider is wired', () => {
+    renderSignIn({ demo: false });
+
+    expect(screen.queryByTestId('sign-in-demo')).toBeNull();
+  });
+
   it('signs in when asked', () => {
     const { onSignIn } = renderSignIn();
 

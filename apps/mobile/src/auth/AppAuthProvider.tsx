@@ -18,5 +18,12 @@ export function AppAuthProvider({ children }: { readonly children: ReactNode }) 
      per render would drop the listeners the provider has already registered. */
   const [adapter] = useState(() => createMockAuthAdapter({ user: DEMO_USER }));
 
-  return <AuthProvider adapter={adapter}>{children}</AuthProvider>;
+  /* `demo` because this is the mock: signing in here does not talk to Google, it writes the
+     fixed account below. The screen says so, and both go away together when the real adapter
+     lands — this is the one file that swap touches. */
+  return (
+    <AuthProvider adapter={adapter} demo>
+      {children}
+    </AuthProvider>
+  );
 }

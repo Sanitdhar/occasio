@@ -1,5 +1,13 @@
 import type { AuthAdapter, AuthSession } from '@occasio/data';
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 
 /**
  * Who is signed in, for the screens that need to know.
@@ -20,18 +28,38 @@ type AuthValue = {
   readonly state: AuthState;
   readonly signIn: () => Promise<void>;
   readonly signOut: () => Promise<void>;
+  /**
+   * Whether this is the mock rather than a real provider.
+   *
+   * Carried so a screen can say so. A button reading "Continue with Google" that signs somebody
+   * in as a fixed account, with nothing on screen admitting it, is the app lying about what it
+   * just did — and the person most likely to be misled is whoever is demonstrating it.
+   */
+  readonly demo: boolean;
 };
 
 const AuthContext = createContext<AuthValue | null>(null);
 
 export function AuthProvider({
   adapter,
+  demo = false,
   children,
 }: {
   readonly adapter: AuthAdapter;
+  readonly demo?: boolean | undefined;
   readonly children: ReactNode;
 }) {
   const [state, setState] = useState<AuthState>({ status: 'restoring' });
+
+  /*
+   * One sign-in at a time, across every caller rather than every screen.
+   *
+   * A screen's own `busy` flag protects that screen and nothing else, and it is set a render
+   * later than the click — so a double tap, or two components each with a sign-in button, can
+   * both reach the adapter. With a real provider that is two redirects started at once, and the
+   * second one wins whichever account the first was in the middle of choosing.
+   */
+  const inFlight = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     /*
@@ -48,10 +76,21 @@ export function AuthProvider({
   const value = useMemo<AuthValue>(
     () => ({
       state,
-      signIn: () => adapter.signInWithOAuth('google'),
+      demo,
+      signIn: () => {
+        if (inFlight.current !== null) return inFlight.current;
+
+        /* Cleared only if this is still the current attempt, so a late `finally` from an
+           abandoned one cannot unlock a newer sign-in that is still running. */
+        const started: Promise<void> = adapter.signInWithOAuth('google').finally(() => {
+          if (inFlight.current === started) inFlight.current = null;
+        });
+        inFlight.current = started;
+        return started;
+      },
       signOut: () => adapter.signOut(),
     }),
-    [state, adapter],
+    [state, adapter, demo],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

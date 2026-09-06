@@ -54,6 +54,33 @@ const counting = (inner: AuthAdapter) => {
   return { adapter, live: () => live };
 };
 
+/**
+ * The context value, captured on every render.
+ *
+ * Read back through `.at(-1)` with a check rather than a cast — `signIn`'s identity changes when
+ * the state does, so a value grabbed once goes stale, and a cast to paper over that is a lint
+ * error here for good reason.
+ */
+const captureAuth = (adapter: AuthAdapter) => {
+  const seen: ReturnType<typeof useAuth>[] = [];
+  const Capture = () => {
+    seen.push(useAuth());
+    return null;
+  };
+
+  render(
+    <AuthProvider adapter={adapter}>
+      <Capture />
+    </AuthProvider>,
+  );
+
+  return () => {
+    const latest = seen.at(-1);
+    if (latest === undefined) throw new Error('the provider rendered nothing');
+    return latest;
+  };
+};
+
 const mount = (adapter: AuthAdapter) =>
   render(
     <AuthProvider adapter={adapter}>
@@ -134,6 +161,49 @@ describe('AuthProvider', () => {
     unmount();
 
     expect(live()).toBe(0);
+  });
+
+  it('starts one sign-in however many callers ask', async () => {
+    /*
+     * A screen's `busy` flag protects that screen and is set a render later than the click, so a
+     * double tap — or two components each holding a sign-in button — can both reach the adapter.
+     * With a real provider that is two redirects started at once, and the second wins whichever
+     * account the first was in the middle of choosing.
+     */
+    const attempts: unknown[] = [];
+    const inner = createMockAuthAdapter({ user: USER, storage: createMemoryStorage() });
+    const adapter: AuthAdapter = {
+      ...inner,
+      signInWithOAuth: (provider) => {
+        attempts.push(provider);
+        return inner.signInWithOAuth(provider);
+      },
+    };
+
+    const auth = captureAuth(adapter);
+
+    const first = auth().signIn();
+    const second = auth().signIn();
+
+    /* The same promise, not two — a later caller joins the attempt already running. */
+    expect(second).toBe(first);
+    await act(async () => {
+      await Promise.all([first, second]);
+    });
+    expect(attempts).toEqual(['google']);
+  });
+
+  it('allows a fresh attempt after the last one settled', async () => {
+    /* Single-flight is not once-only: a failed or completed sign-in must be retryable. */
+    const adapter = createMockAuthAdapter({ user: USER, storage: createMemoryStorage() });
+    const auth = captureAuth(adapter);
+
+    const first = auth().signIn();
+    await act(async () => {
+      await first;
+    });
+
+    expect(auth().signIn()).not.toBe(first);
   });
 
   it('fails loudly outside a provider', () => {

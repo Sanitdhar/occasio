@@ -1,54 +1,30 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { useAuth } from '../src/auth/AuthProvider';
-import { safeNext } from '../src/auth/nextRoute';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { SignInScreen } from '../src/features/auth/SignInScreen';
+import { useSignInFlow } from '../src/features/auth/useSignInFlow';
 
 /**
- * The route: where signing in leads, and where it came from.
- *
- * `next` carries the route somebody was heading for. It arrives from a URL, so it is passed
- * through `safeNext` before it is followed — see that file for why an unchecked one is an open
- * redirect rather than a convenience.
+ * The route: the parameter, and where signing in leads.
  */
 export default function Route() {
   const { next } = useLocalSearchParams<{ next?: string }>();
-  const { state, signIn } = useAuth();
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [busy, setBusy] = useState(false);
 
-  const destination = safeNext(next);
+  const flow = useSignInFlow({
+    next,
+    onSignedIn: (destination) => {
+      /* `replace`, not `push`: the sign-in screen is how somebody got in, not somewhere to go
+         back to. Leaving it on the stack means the back gesture lands on it again. */
+      router.replace(destination);
+    },
+  });
 
   /*
-   * Already signed in — somebody who followed a stale link, or came back to this route from
-   * history. `Redirect` rather than an effect, because rendering a sign-in button to a person
-   * who is signed in and then moving them is a flicker with a wrong screen in it.
+   * Declarative, because navigating during render is a side effect in render — React may run it
+   * twice, and under Strict Mode does. `Redirect` is expo-router's answer for the case where a
+   * route decides, before painting anything, that it is not the right route.
    */
-  if (state.status === 'signed-in') {
-    router.replace(destination);
-    return null;
-  }
+  if (flow.alreadySignedIn) return <Redirect href={flow.destination} />;
 
   return (
-    <SignInScreen
-      busy={busy}
-      error={error}
-      onSignIn={() => {
-        setBusy(true);
-        setError(undefined);
-        void signIn()
-          .then(() => {
-            router.replace(destination);
-          })
-          .catch(() => {
-            /* Nothing specific to say: there is one provider and one failure worth reporting,
-               which is that it did not work. */
-            setError('Could not sign in. Please try again.');
-          })
-          .finally(() => {
-            setBusy(false);
-          });
-      }}
-    />
+    <SignInScreen busy={flow.busy} error={flow.error} demo={flow.demo} onSignIn={flow.start} />
   );
 }

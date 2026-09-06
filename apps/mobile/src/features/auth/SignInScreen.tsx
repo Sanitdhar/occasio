@@ -28,6 +28,14 @@ export type SignInScreenProps = {
   readonly error?: string | undefined;
   /** Names the event somebody was heading for, when there is one. */
   readonly destination?: string | undefined;
+  /**
+   * Whether signing in is the mock rather than a real provider.
+   *
+   * Said out loud when it is. A button reading "Continue with Google" that signs somebody in as
+   * a fixed account without admitting it is the app lying about what it just did — and the
+   * person most likely to be misled is whoever is demonstrating it to somebody else.
+   */
+  readonly demo?: boolean | undefined;
 };
 
 const useStyles = createStyles((t) => ({
@@ -35,7 +43,13 @@ const useStyles = createStyles((t) => ({
   actions: { gap: t.space(2), marginTop: t.space(4) },
 }));
 
-export function SignInScreen({ onSignIn, busy = false, error, destination }: SignInScreenProps) {
+export function SignInScreen({
+  onSignIn,
+  busy = false,
+  error,
+  destination,
+  demo = false,
+}: SignInScreenProps) {
   const styles = useStyles();
 
   return (
@@ -55,6 +69,12 @@ export function SignInScreen({ onSignIn, busy = false, error, destination }: Sig
             testID="sign-in-google"
             onPress={onSignIn}
           />
+          {demo ? (
+            <Text variant="caption" tone="muted" testID="sign-in-demo">
+              Google sign-in is not connected yet — this signs you in as the demo account. Native
+              Google needs a development build; see ADR-0007.
+            </Text>
+          ) : null}
           {error === undefined ? null : (
             /* `Text` has no danger tone — the resolver only guarantees contrast for the
                content colours, and a solid `danger` fill is not one of them (textTokens.ts).
