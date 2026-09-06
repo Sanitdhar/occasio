@@ -22,8 +22,21 @@ const moduleNameMapper = {
  */
 const modulePathIgnorePatterns = ['<rootDir>/.claude/'];
 
+/*
+ * `runtime: 'automatic'` matches `"jsx": "react-jsx"` in tsconfig.base.json. Without it swc
+ * emits `React.createElement`, and every component test fails with `React is not defined` --
+ * the files do not import React, because with the automatic runtime they do not have to.
+ */
 const transform = {
-  '^.+\\.(t|j)sx?$': ['@swc/jest', { jsc: { parser: { syntax: 'typescript', tsx: true } } }],
+  '^.+\\.(t|j)sx?$': [
+    '@swc/jest',
+    {
+      jsc: {
+        parser: { syntax: 'typescript', tsx: true },
+        transform: { react: { runtime: 'automatic' } },
+      },
+    },
+  ],
 };
 
 export default {
@@ -38,8 +51,38 @@ export default {
         // App-level logic is testable too — navigation ordering is pure and had a real bug.
         '<rootDir>/apps/*/src/**/*.test.ts',
       ],
-      testPathIgnorePatterns: ['\\.contract\\.test\\.'],
+      testPathIgnorePatterns: ['\\.contract\\.test\\.', '\\.dom\\.test\\.'],
       moduleNameMapper,
+      modulePathIgnorePatterns,
+      transform,
+    },
+    {
+      /*
+       * Components, rendered. Not `jest-expo`: that preset pulls `react-server-dom-webpack`,
+       * whose peer range does not include the React that Expo SDK 57 pins, so installing it
+       * requires `--legacy-peer-deps` and silences every genuine peer conflict from then on
+       * (#110). Rendering through `react-native-web` needs no such concession — it is the same
+       * translation the web export already ships, so a component proved here is proved on the
+       * platform D30 ships first.
+       *
+       * What this does not cover is the native rendering path; that stays the visual gate's and
+       * the device's job. A test that runs is worth more than one blocked on a dependency
+       * argument, as long as its limits are written down.
+       */
+      displayName: 'components',
+      rootDir: '.',
+      testEnvironment: 'jsdom',
+      testMatch: ['<rootDir>/packages/*/src/**/*.dom.test.tsx'],
+      moduleNameMapper: { ...moduleNameMapper, '^react-native$': 'react-native-web' },
+      /*
+       * `.web` first, so the platform split resolves the way Metro resolves it for web.
+       *
+       * `js` before `ts` for the rest, which is not cosmetic: a dependency shipping both a
+       * compiled `dist/index.js` and the `sources/index.ts` it was built from must resolve to
+       * the former. With `ts` first, Jest picks the untranspiled source and dies on its ESM --
+       * `dom-accessibility-api`, reached through @testing-library, does exactly this.
+       */
+      moduleFileExtensions: ['web.tsx', 'web.ts', 'js', 'jsx', 'mjs', 'ts', 'tsx', 'json'],
       modulePathIgnorePatterns,
       transform,
     },
