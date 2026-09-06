@@ -79,8 +79,10 @@ export const matchesGlob = (pattern, path) => {
     .replace(/[.+^${}()|[\]\\*?]/g, (char) => `\\${char}`)
     /* The single star, now unambiguous: one segment only, so `*.json` cannot cross a slash. */
     .replace(/\\\*/g, '[^/]*')
-    .replace(GLOBSTAR_SLASH, '(?:.*/)?')
-    .replace(GLOBSTAR, '.*');
+    /* `replaceAll`, because `replace` with a string argument replaces only the first match, so
+       a pattern with two globstars kept its second marker and matched nothing at all. */
+    .replaceAll(GLOBSTAR_SLASH, '(?:.*/)?')
+    .replaceAll(GLOBSTAR, '.*');
 
   return new RegExp(`^${source}$`).test(path);
 };

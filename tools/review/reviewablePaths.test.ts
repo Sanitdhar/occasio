@@ -81,6 +81,16 @@ describe('matchesGlob', () => {
     expect(matchesGlob('config.*', 'configxjson')).toBe(false);
   });
 
+  it('restores every globstar, not just the first', () => {
+    /* `replace` with a string argument replaces one occurrence, so a second `**` left its
+       marker in the compiled regex and the pattern matched nothing — a path filter that
+       matches nothing fails open. */
+    expect(matchesGlob('**/generated/**/snapshot.png', 'a/generated/b/snapshot.png')).toBe(true);
+    expect(matchesGlob('**/generated/**/snapshot.png', 'generated/snapshot.png')).toBe(true);
+    expect(matchesGlob('**/generated/**/snapshot.png', 'a/b/snapshot.png')).toBe(false);
+    expect(matchesGlob('**/a/**/b/**', 'x/a/y/b/z')).toBe(true);
+  });
+
   it('keeps a single * inside one segment', () => {
     /* The difference that matters: `*.json` must not swallow `a/b.json`, or one careless
        pattern stops the gate guarding a whole tree. */
