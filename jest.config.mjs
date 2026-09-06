@@ -105,6 +105,9 @@ export default {
        * `dom-accessibility-api`, reached through @testing-library, does exactly this.
        */
       moduleFileExtensions: ['web.tsx', 'web.ts', 'js', 'jsx', 'mjs', 'ts', 'tsx', 'json'],
+      /* Before the test module and its imports, so react-native-web captures a live media
+         query list rather than the `null` jsdom leaves it with. See test/setup/mediaQuery.ts. */
+      setupFiles: ['<rootDir>/test/setup/installMatchMedia.ts'],
       modulePathIgnorePatterns,
       transform,
     },
