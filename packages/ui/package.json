@@ -12,6 +12,6 @@
     "expo-image": ">=57",
     "expo-linear-gradient": ">=57",
     "react": "^19.0.0",
-    "react-native": ">=0.77"
+    "react-native": ">=0.78"
   }
 }

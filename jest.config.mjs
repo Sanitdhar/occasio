@@ -77,7 +77,20 @@ export default {
       rootDir: '.',
       testEnvironment: 'jsdom',
       testMatch: ['<rootDir>/packages/*/src/**/*.dom.test.tsx'],
-      moduleNameMapper: { ...moduleNameMapper, '^react-native$': 'react-native-web' },
+      /*
+       * `react-native` becomes its web build; the two Expo packages become stubs.
+       *
+       * Not a transform of the real ones: they reach for the Expo runtime and the native module
+       * registry, which a jsdom test has no use for, and pulling all of it in makes the suite
+       * slow and its failures unreadable — the first attempt reported a syntax error inside a
+       * doc comment. See test/stubs for what the substitution gives up.
+       */
+      moduleNameMapper: {
+        ...moduleNameMapper,
+        '^react-native$': 'react-native-web',
+        '^expo-image$': '<rootDir>/test/stubs/expo-image.tsx',
+        '^expo-linear-gradient$': '<rootDir>/test/stubs/expo-linear-gradient.tsx',
+      },
       /*
        * `.web` first, so the platform split resolves the way Metro resolves it for web.
        *

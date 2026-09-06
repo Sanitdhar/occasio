@@ -1,6 +1,6 @@
-import type { ReactElement } from 'react';
+import { isValidElement, type ReactElement } from 'react';
 import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import type { ImageProps } from '../media/Image';
+import { Image, type ImageProps } from '../media/Image';
 import { createStyles } from '../theme/createStyles';
 import { useTheme } from '../theme/useTheme';
 import { initialsFrom } from './initials';
@@ -74,14 +74,29 @@ export type AvatarProps = {
   /**
    * The avatar's photograph, clipped to the circle. Nothing is rendered behind it.
    *
-   * Typed as an `<Image>` element rather than a bare `ReactNode`, because `ReactNode` accepted
+   * Typed as an element taking `ImageProps` rather than a bare `ReactNode`, which had accepted
    * react-native's `Image` — the one this package bans — and with it a photograph that shows a
-   * spinner instead of a blurhash and has no alternative text. The wrapper already requires
-   * both; this is what makes a caller go through it.
+   * spinner instead of a blurhash and has no alternative text.
+   *
+   * The type constrains the props and not the component. `ReactElement<ImageProps, typeof
+   * Image>` looks like it would fix that and does not: JSX produces `React.JSX.Element`, which
+   * is `ReactElement<any, any>` and assignable to anything — I checked, and `<Text>` satisfies
+   * it. Rather than keep a type parameter that reads as an enforcement and is not one, the
+   * identity is checked at runtime below.
    */
   readonly children?: ReactElement<ImageProps> | undefined;
   readonly style?: StyleProp<ViewStyle> | undefined;
   readonly testID?: string | undefined;
+};
+
+/**
+ * Complains in development and stays silent in a shipped build. Metro replaces
+ * `process.env.NODE_ENV` at build time, so the branch leaves the production bundle entirely.
+ */
+const warnInDevelopment = (message: string): void => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn(`<Avatar>: ${message}`);
+  }
 };
 
 export function Avatar({
@@ -95,6 +110,20 @@ export function Avatar({
   const theme = useTheme();
   const styles = useAvatarStyles();
   const palette = tonalPalette(theme, tone);
+
+  /*
+   * The check the prop type cannot make. Anything can satisfy `ReactElement<ImageProps>` — a
+   * component of one's own taking the same props and rendering react-native's `Image` reaches
+   * here happily, which puts a spinner and no alternative text inside the circle.
+   *
+   * A warning rather than a refusal: a wrong image element is a defect, not a reason to blank
+   * a guest's face, and this is exactly the shape of mistake that gets made once and copied.
+   */
+  if (children !== undefined && isValidElement(children) && children.type !== Image) {
+    warnInDevelopment(
+      'children should be the `Image` from @occasio/ui, which is what guarantees a blurhash placeholder and alternative text.',
+    );
+  }
 
   return (
     <View
