@@ -1,24 +1,24 @@
-import { Button, EmptyState, Screen } from '@occasio/ui';
+import { Button, EmptyState, Screen, Skeleton, SkeletonGroup } from '@occasio/ui';
 import { userId, type UserId } from '@occasio/core';
 import type { ReactNode } from 'react';
-import { useCurrentUserId } from '../data/useCurrentUserId';
+import { useAuth } from '../auth/AuthProvider';
 
 /**
  * The super-admin area, which is cross-tenant and therefore not a membership question.
  *
  * **There is no platform-level role in the data model.** `MEMBERSHIP_ROLES` is per event —
  * `event_admin` runs one wedding, not the platform — and `UserRow` carries no staff flag. So
- * this gate is an allow-list of user ids, in the same spirit as `useCurrentUserId`: a constant
- * that is honest about being one, rather than a schema field invented in a feature PR.
+ * this is an allow-list of user ids: a constant that is honest about being one, rather than a
+ * schema field invented in a feature PR. Adding a platform role touches `rows.ts`, which mirrors
+ * the eventual Postgres tables exactly, and it should arrive with the policy that enforces it.
  *
- * That gap is real and worth naming rather than papering over. Adding a platform role touches
- * `rows.ts`, which mirrors the eventual Postgres tables exactly, and it is the sort of change
- * that should arrive with the RLS policy that enforces it — not with a screen that wants to be
- * hidden. Until then this fails closed for everybody not named below, which is the right
- * direction for a gate to be wrong in.
+ * It reads the **session**, not `useCurrentUserId`. That distinction is the whole gate: the
+ * latter is a placeholder constant that answers the same thing whether or not anybody has signed
+ * in, so comparing it to an allow-list let a signed-out visitor straight through. Nobody is a
+ * platform administrator until they are somebody.
  *
  * Like `RoleGate`, this is UX and not enforcement: it decides what is offered, and the database
- * decides what is allowed.
+ * will decide what is allowed.
  */
 
 /** The demo account, so the super-admin screens are reachable in the prototype at all. */
@@ -33,9 +33,24 @@ export function PlatformGate({
   readonly leaveLabel?: string | undefined;
   readonly children: ReactNode;
 }) {
-  const me = useCurrentUserId();
+  const { state } = useAuth();
 
-  if (!PLATFORM_ADMINS.includes(me)) {
+  /* Nothing while storage is still answering — rendering the refusal first would tell a platform
+     administrator they have no access every time they open the page. */
+  if (state.status === 'restoring') {
+    return (
+      <Screen testID="platform-gate-loading">
+        <SkeletonGroup label="Checking your access">
+          <Skeleton width="70%" height={28} />
+          <Skeleton width="100%" height={120} />
+        </SkeletonGroup>
+      </Screen>
+    );
+  }
+
+  const allowed = state.status === 'signed-in' && PLATFORM_ADMINS.includes(state.session.user.id);
+
+  if (!allowed) {
     return (
       <Screen testID="platform-gate-refused">
         <EmptyState
